@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>可编辑 Module 测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .module-display {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 4px;
+        }
+        .editable-module {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background: #f3e8ff;
+            color: #7c3aed;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        .editable-module:hover {
+            background: #e9d5ff;
+        }
+        .edit-icon {
+            width: 12px;
+            height: 12px;
+            opacity: 0.5;
+        }
+        .edit-input {
+            padding: 4px 8px;
+            border: 1px solid #c084fc;
+            border-radius: 4px;
+            font-size: 12px;
+            outline: none;
+        }
+        .edit-input:focus {
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 1px #7c3aed;
+        }
+        .edit-buttons {
+            display: flex;
+            gap: 2px;
+        }
+        .edit-button {
+            padding: 2px;
+            border: none;
+            border-radius: 2px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .save-button {
+            color: #059669;
+        }
+        .save-button:hover {
+            background: #d1fae5;
+        }
+        .cancel-button {
+            color: #dc2626;
+        }
+        .cancel-button:hover {
+            background: #fee2e2;
+        }
+        .button-icon {
+            width: 12px;
+            height: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>可编辑 Module 功能测试</h1>
+    
+    <div class="test-section">
+        <h2>测试用例 1: 基本编辑功能</h2>
+        <div class="module-display">
+            <p>当前模块: <span id="module1">Frontend</span></p>
+            <div id="editable1"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>测试用例 2: 不同模块类型</h2>
+        <div class="module-display">
+            <p>模块列表:</p>
+            <div id="moduleList"></div>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h2>测试用例 3: 长模块名称</h2>
+        <div class="module-display">
+            <p>长模块名称: <span id="module3">User Management and Authentication</span></p>
+            <div id="editable3"></div>
+        </div>
+    </div>
+
+    <script>
+        // 模拟 EditableModule 组件
+        class EditableModule {
+            constructor(container, initialModule, onSave) {
+                this.container = container;
+                this.module = initialModule;
+                this.onSave = onSave;
+                this.isEditing = false;
+                this.render();
+            }
+
+            render() {
+                if (this.isEditing) {
+                    this.renderEditMode();
+                } else {
+                    this.renderDisplayMode();
+                }
+            }
+
+            renderDisplayMode() {
+                this.container.innerHTML = `
+                    <span class="editable-module" onclick="this.parentElement.startEdit()" title="点击编辑模块">
+                        <span>${this.module}</span>
+                        <svg class="edit-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                            <path d="m18.5 2.5 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                        </svg>
+                    </span>
+                `;
+            }
+
+            renderEditMode() {
+                this.container.innerHTML = `
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <input 
+                            type="text" 
+                            class="edit-input" 
+                            value="${this.module}" 
+                            onkeydown="this.parentElement.parentElement.handleKeyDown(event)"
+                            onblur="this.parentElement.parentElement.handleSave()"
+                            placeholder="输入模块名称"
+                            style="font-size: 12px;"
+                        />
+                        <div class="edit-buttons">
+                            <button class="edit-button save-button" onclick="this.parentElement.parentElement.parentElement.handleSave()" title="保存">
+                                <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="20,6 9,17 4,12"></polyline>
+                                </svg>
+                            </button>
+                            <button class="edit-button cancel-button" onclick="this.parentElement.parentElement.parentElement.handleCancel()" title="取消">
+                                <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                // 聚焦到输入框
+                const input = this.container.querySelector('input');
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            }
+
+            startEdit() {
+                this.isEditing = true;
+                this.render();
+            }
+
+            handleSave() {
+                const input = this.container.querySelector('input');
+                if (input) {
+                    const newValue = input.value.trim();
+                    if (newValue && newValue !== this.module) {
+                        this.module = newValue;
+                        if (this.onSave) {
+                            this.onSave(newValue);
+                        }
+                    }
+                }
+                this.isEditing = false;
+                this.render();
+            }
+
+            handleCancel() {
+                this.isEditing = false;
+                this.render();
+            }
+
+            handleKeyDown(event) {
+                if (event.key === 'Enter') {
+                    this.handleSave();
+                } else if (event.key === 'Escape') {
+                    this.handleCancel();
+                }
+            }
+        }
+
+        // 测试用例 1
+        const editable1 = new EditableModule(
+            document.getElementById('editable1'),
+            'Frontend',
+            (newModule) => {
+                document.getElementById('module1').textContent = newModule;
+                console.log('模块已更新为:', newModule);
+            }
+        );
+
+        // 测试用例 2
+        const modules = ['Frontend', 'Backend', 'Database', 'Testing', 'Security', 'DevOps', 'UI/UX', 'Other'];
+        const moduleListContainer = document.getElementById('moduleList');
+        
+        modules.forEach(module => {
+            const moduleDiv = document.createElement('div');
+            moduleDiv.style.marginBottom = '10px';
+            moduleDiv.innerHTML = `<span>${module}: </span>`;
+            moduleListContainer.appendChild(moduleDiv);
+            
+            const editable = new EditableModule(
+                moduleDiv,
+                module,
+                (newModule) => {
+                    console.log(`${module} 已更新为: ${newModule}`);
+                }
+            );
+        });
+
+        // 测试用例 3
+        const editable3 = new EditableModule(
+            document.getElementById('editable3'),
+            'User Management and Authentication',
+            (newModule) => {
+                document.getElementById('module3').textContent = newModule;
+                console.log('长模块名称已更新为:', newModule);
+            }
+        );
+
+        console.log('可编辑 Module 功能测试已加载');
+        console.log('功能说明:');
+        console.log('1. 点击模块标签进入编辑模式');
+        console.log('2. 按 Enter 保存，按 Escape 取消');
+        console.log('3. 点击保存按钮保存，点击取消按钮取消');
+        console.log('4. 失去焦点时自动保存');
+    </script>
+</body>
+</html> 
