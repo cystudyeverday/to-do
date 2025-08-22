@@ -122,15 +122,15 @@ export default function DashboardPage() {
     const sortedItems = projectItems.sort((a, b) => {
       switch (projectFilter.sortBy) {
         case 'status':
-          // Status：按状态优先级排序
+          // Status：按状态优先级排序，Not start 排第一，Completed 排最后
           const statusPriority = {
-            'Completed': 0,
+            'Not start': 0,
             'On progress': 1,
             'Build UI': 2,
             'Integration': 3,
             'Waiting for API': 4,
             'Fix': 5,
-            'Not start': 6
+            'Completed': 6
           };
           const aPriority = statusPriority[a.status] || 0;
           const bPriority = statusPriority[b.status] || 0;
@@ -142,15 +142,15 @@ export default function DashboardPage() {
           if (a.type !== b.type) {
             return a.type === 'Feature' ? -1 : 1;
           }
-          // 相同类型内按状态排序
+          // 相同类型内按状态排序，Not start 排第一，Completed 排最后
           const statusPriorityForType = {
-            'Completed': 0,
+            'Not start': 0,
             'On progress': 1,
             'Build UI': 2,
             'Integration': 3,
             'Waiting for API': 4,
             'Fix': 5,
-            'Not start': 6
+            'Completed': 6
           };
           const aStatusPriority = statusPriorityForType[a.status] || 0;
           const bStatusPriority = statusPriorityForType[b.status] || 0;
@@ -167,15 +167,15 @@ export default function DashboardPage() {
           if (a.type !== b.type) {
             return a.type === 'Feature' ? -1 : 1;
           }
-          // 相同类型内按状态排序
+          // 相同类型内按状态排序，Not start 排第一，Completed 排最后
           const statusPriorityForModule = {
-            'Completed': 0,
+            'Not start': 0,
             'On progress': 1,
             'Build UI': 2,
             'Integration': 3,
             'Waiting for API': 4,
             'Fix': 5,
-            'Not start': 6
+            'Completed': 6
           };
           const aStatusPriorityForModule = statusPriorityForModule[a.status] || 0;
           const bStatusPriorityForModule = statusPriorityForModule[b.status] || 0;
