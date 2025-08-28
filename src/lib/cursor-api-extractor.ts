@@ -1,5 +1,5 @@
 import { SplitResult } from './smart-split';
-import { ItemType } from '@/types';
+import { ItemType, ItemStatus } from '@/types';
 
 export interface CursorAPIRequest {
   text: string;
@@ -202,7 +202,9 @@ Return only the JSON array of tasks, no additional text.`;
           title: (task.title as string) || 'Untitled Task',
           description: (task.description as string) || '',
           type: (task.type as ItemType) || 'Feature',
+          module: (task.module as string) || 'Other',
           summary: (task.summary as string) || (task.title as string)?.substring(0, 20) || 'Task',
+          status: 'Not start' as ItemStatus,
         }));
       }
 
@@ -231,7 +233,9 @@ Return only the JSON array of tasks, no additional text.`;
           title: line.replace(/^\d+\.\s*/, '').trim(),
           description: '',
           type: 'Feature',
+          module: 'Other',
           summary: '',
+          status: 'Not start' as ItemStatus,
         };
       } else if (currentTask.title && line.trim()) {
         // 任务描述

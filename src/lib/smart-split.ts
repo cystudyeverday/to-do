@@ -1,4 +1,4 @@
-import { TodoItem, ItemType } from '@/types';
+import { TodoItem, ItemType, ItemStatus } from '@/types';
 
 export interface SplitResult {
   title: string;
@@ -6,6 +6,7 @@ export interface SplitResult {
   type: ItemType;
   module: string;
   summary: string;
+  status: 'Not start' | 'On progress' | 'Waiting for API' | 'Build UI' | 'Integration' | 'Completed' | 'Fix';
 }
 
 export class SmartSplitter {
@@ -120,7 +121,8 @@ export class SmartSplitter {
         description: trimmed,
         type,
         module,
-        summary
+        summary,
+        status: 'Not start' as ItemStatus
       });
     });
 

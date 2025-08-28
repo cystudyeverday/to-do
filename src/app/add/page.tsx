@@ -200,7 +200,11 @@ Return only the JSON array, no additional text.`;
       let results: SplitResult[];
       let summary: string;
       let confidence = 0;
-      let stats = null;
+      let stats: {
+        model?: string;
+        tokens_used?: number;
+        processing_time?: number;
+      } | null = null;
 
       if (extractionMethod === 'agent') {
         // Cursor Agent 模式
@@ -222,9 +226,9 @@ Return only the JSON array, no additional text.`;
         summary = cursorResponse.summary;
         confidence = cursorResponse.confidence;
         stats = {
-          model: cursorResponse.model,
-          tokens_used: cursorResponse.tokens_used,
-          processing_time: cursorResponse.processing_time,
+          model: cursorResponse.model || undefined,
+          tokens_used: cursorResponse.tokens_used || undefined,
+          processing_time: cursorResponse.processing_time || undefined,
         };
       } else if (extractionMethod === 'api' && apiAvailable) {
         // 使用本地API提取
@@ -591,6 +595,7 @@ Return only the JSON array, no additional text.`;
                 type: result.type,
                 status: 'Not start' as ItemStatus,
                 projectId: selectedProject,
+                module: result.module,
                 createdAt: new Date(),
                 updatedAt: new Date()
               }))}
@@ -599,7 +604,9 @@ Return only the JSON array, no additional text.`;
                   title: item.title,
                   description: item.description,
                   type: item.type,
-                  summary: splitResults[idx]?.summary || ''
+                  module: item.module,
+                  summary: splitResults[idx]?.summary || '',
+                  status: item.status as ItemStatus
                 }));
                 setSplitResults(newResults);
               }}

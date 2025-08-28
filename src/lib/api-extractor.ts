@@ -71,7 +71,9 @@ export class APIExtractor {
         title: `${request.projectName} - Task ${index + 1}`,
         description: sentence.trim(),
         type: isFeature ? 'Feature' : 'Issue',
+        module: 'Other',
         summary: sentence.substring(0, 20) + '...',
+        status: 'Not start',
       });
     });
 

@@ -4,12 +4,8 @@ import { useState, useEffect } from 'react';
 import { TodoItem, Project, ItemStatus } from '@/types';
 import { StorageManager } from '@/lib/storage';
 import { StatisticsCalculator } from '@/lib/statistics';
-import { StatusBadge } from '@/components/ui/status-badge';
-import { Navigation } from '@/components/navigation';
 import { ProjectModal } from '@/components/project-modal';
-import { QuickEdit } from '@/components/quick-edit';
 import { QuickAddModal } from '@/components/quick-add-modal';
-import { BatchManager } from '@/components/batch-manager';
 import { EditableModule } from '@/components/editable-module';
 import { formatRelativeTime } from '@/lib/utils';
 import { ExcelExporter } from '@/lib/excel-export';
@@ -23,7 +19,8 @@ import {
   Clock,
   GripVertical,
   AlertCircle,
-  BarChart3
+  BarChart3,
+  Archive
 } from 'lucide-react';
 
 export default function DashboardPage() {
@@ -39,6 +36,7 @@ export default function DashboardPage() {
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [projectItemOrder, setProjectItemOrder] = useState<Record<string, string[]>>({});
   const [projectFilters, setProjectFilters] = useState<Record<string, { filterType: 'all' | 'Feature' | 'Issue', sortBy: 'status' | 'type' | 'updatedAt' | 'createdAt' | 'module' }>>({});
+  const [archivingProject, setArchivingProject] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -57,32 +55,38 @@ export default function DashboardPage() {
     };
   }, [statusDropdownOpen]);
 
-  const loadData = () => {
-    const projectsData = StorageManager.getProjects();
-    const itemsData = StorageManager.getItems();
+  const loadData = async () => {
+    try {
+      const projectsData = StorageManager.getProjects();
+      const itemsData = StorageManager.getItems();
 
-    // 为现有任务添加默认module字段（如果没有的话）
-    const updatedItems = itemsData.map(item => ({
-      ...item,
-      module: (item as any).module || 'Other'
-    }));
+      // 为现有任务添加默认module字段（如果没有的话）
+      const updatedItems = itemsData.map(item => ({
+        ...item,
+        module: (item as any).module || 'Other'
+      }));
 
-    // 如果有任务被更新，保存到本地存储
-    if (updatedItems.length !== itemsData.length ||
-      updatedItems.some((item, i) => item.module !== (itemsData[i] as any).module)) {
-      StorageManager.saveItems(updatedItems);
+      // 如果有任务被更新，保存到存储
+      if (updatedItems.length !== itemsData.length ||
+        updatedItems.some((item, i) => item.module !== (itemsData[i] as any).module)) {
+        for (const item of updatedItems) {
+          StorageManager.updateItem(item.id, { module: item.module });
+        }
+      }
+
+      setProjects(projectsData);
+      setItems(updatedItems);
+
+      // 初始化项目排序状态
+      const orderState: Record<string, string[]> = {};
+      projectsData.forEach(project => {
+        const projectItems = updatedItems.filter(item => item.projectId === project.id);
+        orderState[project.id] = projectItems.map(item => item.id);
+      });
+      setProjectItemOrder(orderState);
+    } catch (error) {
+      console.error('Error loading data:', error);
     }
-
-    setProjects(projectsData);
-    setItems(updatedItems);
-
-    // 初始化项目排序状态
-    const orderState: Record<string, string[]> = {};
-    projectsData.forEach(project => {
-      const projectItems = updatedItems.filter(item => item.projectId === project.id);
-      orderState[project.id] = projectItems.map(item => item.id);
-    });
-    setProjectItemOrder(orderState);
   };
 
   const toggleProject = (projectId: string) => {
@@ -96,7 +100,7 @@ export default function DashboardPage() {
   };
 
   const getProjectItems = (projectId: string) => {
-    let projectItems = items.filter(item => item.projectId === projectId);
+    let projectItems = items.filter(item => item.projectId === projectId && item.status !== 'Archive' as ItemStatus);
 
     // 获取项目的过滤设置，如果没有则使用默认值
     const projectFilter = projectFilters[projectId] || { filterType: 'all', sortBy: 'status' };
@@ -126,14 +130,11 @@ export default function DashboardPage() {
           const statusPriority = {
             'Not start': 0,
             'On progress': 1,
-            'Build UI': 2,
-            'Integration': 3,
-            'Waiting for API': 4,
-            'Fix': 5,
-            'Completed': 6
+            'Pending': 2,
+            'Completed': 3
           };
-          const aPriority = statusPriority[a.status] || 0;
-          const bPriority = statusPriority[b.status] || 0;
+          const aPriority = statusPriority[a.status as keyof typeof statusPriority] || 0;
+          const bPriority = statusPriority[b.status as keyof typeof statusPriority] || 0;
           return aPriority - bPriority;
 
         case 'type':
@@ -146,14 +147,11 @@ export default function DashboardPage() {
           const statusPriorityForType = {
             'Not start': 0,
             'On progress': 1,
-            'Build UI': 2,
-            'Integration': 3,
-            'Waiting for API': 4,
-            'Fix': 5,
-            'Completed': 6
+            'Pending': 2,
+            'Completed': 3
           };
-          const aStatusPriority = statusPriorityForType[a.status] || 0;
-          const bStatusPriority = statusPriorityForType[b.status] || 0;
+          const aStatusPriority = statusPriorityForType[a.status as keyof typeof statusPriorityForType] || 0;
+          const bStatusPriority = statusPriorityForType[b.status as keyof typeof statusPriorityForType] || 0;
           return aStatusPriority - bStatusPriority;
 
         case 'module':
@@ -171,14 +169,11 @@ export default function DashboardPage() {
           const statusPriorityForModule = {
             'Not start': 0,
             'On progress': 1,
-            'Build UI': 2,
-            'Integration': 3,
-            'Waiting for API': 4,
-            'Fix': 5,
-            'Completed': 6
+            'Pending': 2,
+            'Completed': 3
           };
-          const aStatusPriorityForModule = statusPriorityForModule[a.status] || 0;
-          const bStatusPriorityForModule = statusPriorityForModule[b.status] || 0;
+          const aStatusPriorityForModule = statusPriorityForModule[a.status as keyof typeof statusPriorityForModule] || 0;
+          const bStatusPriorityForModule = statusPriorityForModule[b.status as keyof typeof statusPriorityForModule] || 0;
           return aStatusPriorityForModule - bStatusPriorityForModule;
 
         case 'updatedAt':
@@ -257,32 +252,65 @@ export default function DashboardPage() {
     }));
   };
 
-  const handleModuleUpdate = (itemId: string, newModule: string) => {
-    const updatedItems = items.map(item => {
-      if (item.id === itemId) {
-        return { ...item, module: newModule, updatedAt: new Date() };
+  const handleModuleUpdate = async (itemId: string, newModule: string) => {
+    try {
+      const updatedItem = StorageManager.updateItem(itemId, { module: newModule });
+      if (updatedItem) {
+        const updatedItems = items.map(item =>
+          item.id === itemId ? updatedItem : item
+        );
+        setItems(updatedItems);
       }
-      return item;
-    });
+    } catch (error) {
+      console.error('Error updating module:', error);
+    }
+  };
 
-    // 保存到本地存储
-    StorageManager.saveItems(updatedItems);
-    setItems(updatedItems);
+  const handleArchiveProject = async (projectId: string) => {
+    try {
+      setArchivingProject(projectId);
+      // 归档功能暂时使用本地存储
+      const projectItems = items.filter(item => item.projectId === projectId && item.status === 'Completed');
+      let archivedCount = 0;
+
+      for (const item of projectItems) {
+        const updated = StorageManager.updateItem(item.id, { status: 'Archive' as ItemStatus });
+        if (updated) archivedCount++;
+      }
+
+      if (archivedCount > 0) {
+        // 重新加载数据以反映归档状态
+        loadData();
+        alert(`Successfully archived ${archivedCount} completed items`);
+      } else {
+        alert('No completed items to archive');
+      }
+    } catch (error) {
+      console.error('Archive error:', error);
+      alert('Failed to archive items');
+    } finally {
+      setArchivingProject(null);
+    }
   };
 
   const handleDeleteProject = (project: Project) => {
     setProjectToDelete(project);
   };
 
-  const confirmDeleteProject = () => {
+  const confirmDeleteProject = async () => {
     if (!projectToDelete) return;
 
-    const success = StorageManager.deleteProject(projectToDelete.id);
-    if (success) {
-      setProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
-      setItems(prev => prev.filter(item => item.projectId !== projectToDelete.id));
-      setProjectToDelete(null);
-    } else {
+    try {
+      const success = StorageManager.deleteProject(projectToDelete.id);
+      if (success) {
+        setProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
+        setItems(prev => prev.filter(item => item.projectId !== projectToDelete.id));
+        setProjectToDelete(null);
+      } else {
+        alert('Failed to delete project. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error deleting project:', error);
       alert('Failed to delete project. Please try again.');
     }
   };
@@ -307,7 +335,7 @@ export default function DashboardPage() {
     setDragOverItem(null);
   };
 
-  const handleDrop = (e: React.DragEvent, targetItemId: string) => {
+  const handleDrop = async (e: React.DragEvent, targetItemId: string) => {
     e.preventDefault();
     if (!draggedItem || draggedItem === targetItemId) return;
 
@@ -344,16 +372,18 @@ export default function DashboardPage() {
     }));
 
     // 更新项目的更新时间
-    const updatedItems = items.map(item => {
-      if (item.id === draggedItem) {
-        return { ...item, updatedAt: new Date() };
+    try {
+      const updatedItem = StorageManager.updateItem(draggedItem, { updatedAt: new Date() });
+      if (updatedItem) {
+        const updatedItems = items.map(item =>
+          item.id === draggedItem ? updatedItem : item
+        );
+        setItems(updatedItems);
       }
-      return item;
-    });
+    } catch (error) {
+      console.error('Error updating item order:', error);
+    }
 
-    // 保存到本地存储
-    StorageManager.saveItems(updatedItems);
-    setItems(updatedItems);
     setDraggedItem(null);
     setDragOverItem(null);
   };
@@ -364,14 +394,10 @@ export default function DashboardPage() {
         return 'border-green-200 bg-green-50';
       case 'On progress':
         return 'border-blue-200 bg-blue-50';
-      case 'Waiting for API':
+      case 'Pending':
         return 'border-yellow-200 bg-yellow-50';
-      case 'Build UI':
-        return 'border-purple-200 bg-purple-50';
-      case 'Integration':
-        return 'border-indigo-200 bg-indigo-50';
-      case 'Fix':
-        return 'border-red-200 bg-red-50';
+      case 'Not start':
+        return 'border-gray-200 bg-gray-50';
       default:
         return 'border-gray-200 bg-gray-50';
     }
@@ -383,14 +409,10 @@ export default function DashboardPage() {
         return { bg: '#dcfce7', text: '#166534' };
       case 'On progress':
         return { bg: '#dbeafe', text: '#1e40af' };
-      case 'Waiting for API':
+      case 'Pending':
         return { bg: '#fef3c7', text: '#92400e' };
-      case 'Build UI':
-        return { bg: '#f3e8ff', text: '#7c3aed' };
-      case 'Integration':
-        return { bg: '#e0e7ff', text: '#4338ca' };
-      case 'Fix':
-        return { bg: '#fee2e2', text: '#dc2626' };
+      case 'Not start':
+        return { bg: '#f3f4f6', text: '#374151' };
       default:
         return { bg: '#f3f4f6', text: '#374151' };
     }
@@ -400,7 +422,7 @@ export default function DashboardPage() {
     setStatusDropdownOpen(statusDropdownOpen === itemId ? null : itemId);
   };
 
-  const handleStatusChange = (itemId: string, newStatus: ItemStatus) => {
+  const handleStatusChange = async (itemId: string, newStatus: ItemStatus) => {
     try {
       const updatedItem = StorageManager.updateItem(itemId, { status: newStatus });
       if (updatedItem) {
@@ -569,6 +591,14 @@ export default function DashboardPage() {
                           <Plus className="w-4 h-4" />
                         </button>
                         <button
+                          onClick={() => handleArchiveProject(project.id)}
+                          disabled={archivingProject === project.id}
+                          className="p-2 text-orange-600 hover:bg-orange-50 rounded-md disabled:opacity-50"
+                          title="Archive completed tasks"
+                        >
+                          <Archive className="w-4 h-4" />
+                        </button>
+                        <button
                           onClick={() => handleExportProject(project)}
                           className="p-2 text-gray-600 hover:bg-gray-50 rounded-md"
                           title="Export project tasks"
@@ -657,7 +687,7 @@ export default function DashboardPage() {
                               <GripVertical className="w-4 h-4" />
                             </div>
                             <div className="flex-1">
-                              <div className="flex items-center space-x-3 mb-2">
+                              <div className="flex items-center space-x-3">
                                 <div className="flex items-center space-x-2">
                                   <span className="text-lg">
                                     {item.type === 'Feature' ? '✨' : '🐛'}
@@ -665,7 +695,6 @@ export default function DashboardPage() {
                                   <h4 className="font-medium text-gray-900">{item.title}</h4>
                                 </div>
                               </div>
-                              <p className="text-sm text-gray-600 mb-2">{item.description}</p>
                               <div className="flex items-center space-x-3">
                                 <div className="relative status-dropdown">
                                   <button
@@ -683,7 +712,7 @@ export default function DashboardPage() {
                                   {statusDropdownOpen === item.id && (
                                     <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10">
                                       <div className="py-1">
-                                        {(['Not start', 'On progress', 'Waiting for API', 'Build UI', 'Integration', 'Completed', 'Fix'] as ItemStatus[]).map((status) => (
+                                        {(['Not start', 'On progress', 'Pending', 'Completed'] as ItemStatus[]).map((status) => (
                                           <button
                                             key={status}
                                             onClick={() => handleStatusChange(item.id, status)}

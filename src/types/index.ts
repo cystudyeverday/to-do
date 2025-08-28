@@ -1,5 +1,5 @@
 export type ItemType = 'Feature' | 'Issue';
-export type ItemStatus = 'Not start' | 'On progress' | 'Waiting for API' | 'Build UI' | 'Integration' | 'Completed' | 'Fix';
+export type ItemStatus = 'Not start' | 'On progress' | 'Pending' | 'Completed' | 'Archive';
 
 export interface TodoItem {
   id: string;
@@ -8,6 +8,7 @@ export interface TodoItem {
   type: ItemType;
   status: ItemStatus;
   projectId: string;
+  module?: string;
   createdAt: Date;
   updatedAt: Date;
   completedAt?: Date;

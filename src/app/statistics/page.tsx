@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { TodoItem, Project, Statistics } from '@/types';
 import { StorageManager } from '@/lib/storage';
 import { StatisticsCalculator } from '@/lib/statistics';
+import { format } from 'date-fns';
 import {
   BarChart,
   Bar,
@@ -36,11 +37,63 @@ export default function StatisticsPage() {
     loadStatistics();
   }, []);
 
-  const loadStatistics = () => {
-    const projects = StorageManager.getProjects();
-    const items = StorageManager.getItems();
-    const statistics = StatisticsCalculator.calculateStatistics(items, projects);
-    setStats(statistics);
+  const loadStatistics = async () => {
+    try {
+      const projects = StorageManager.getProjects();
+      const items = StorageManager.getItems();
+      const statistics = StatisticsCalculator.calculateStatistics(items, projects);
+
+      // 计算本周完成的任务
+      const now = new Date();
+      const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
+      const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+      
+      const weeklyCompletedItems = items.filter(item => 
+        item.status === 'Completed' && 
+        item.completedAt && 
+        item.completedAt >= weekStart && 
+        item.completedAt < weekEnd
+      );
+
+      // 更新本周完成的任务数量和每日完成统计
+      statistics.weeklyCompletedItems = weeklyCompletedItems.length;
+      
+      // 重新计算每日完成统计，基于本地数据
+      const dailyCompletions = calculateDailyCompletions(weeklyCompletedItems);
+      statistics.dailyCompletions = dailyCompletions;
+
+      setStats(statistics);
+    } catch (error) {
+      console.error('Error loading statistics:', error);
+      // 降级到本地计算
+      const projects = StorageManager.getProjects();
+      const items = StorageManager.getItems();
+      const statistics = StatisticsCalculator.calculateStatistics(items, projects);
+      setStats(statistics);
+    }
+  };
+
+  // 计算每日完成统计
+  const calculateDailyCompletions = (weeklyCompletedItems: TodoItem[]) => {
+    const dailyCompletions: { date: string; completedCount: number; }[] = [];
+    
+    for (let i = 6; i >= 0; i--) {
+      const date = new Date();
+      date.setDate(date.getDate() - i);
+      const dayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      const dayEnd = new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
+
+      const dayCompletedItems = weeklyCompletedItems.filter(item =>
+        item.completedAt && item.completedAt >= dayStart && item.completedAt < dayEnd
+      );
+
+      dailyCompletions.push({
+        date: format(dayStart, 'MM/dd'),
+        completedCount: dayCompletedItems.length,
+      });
+    }
+
+    return dailyCompletions;
   };
 
   if (!stats) {

@@ -13,9 +13,7 @@ export class StatisticsCalculator {
 
     const completedItems = items.filter(item => item.status === 'Completed');
     const inProgressItems = items.filter(item => item.status === 'On progress');
-    const pendingItems = items.filter(item =>
-      item.status !== 'Completed' && item.status !== 'On progress'
-    );
+    const pendingItems = items.filter(item => item.status === 'Not start'); // Pending is mapped to Not start
 
     const weeklyCompletedItems = weeklyItems.filter(item => item.status === 'Completed');
     const weeklyNewItems = weeklyItems.length;

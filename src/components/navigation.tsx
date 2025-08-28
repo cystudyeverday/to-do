@@ -16,7 +16,6 @@ import { cn } from '@/lib/utils';
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: Home },
   { name: 'Statistics', href: '/statistics', icon: PieChart },
-  { name: 'Smart Add', href: '/add', icon: Plus },
   { name: 'Task Management', href: '/items', icon: List },
   { name: 'Database', href: '/database', icon: Database },
 ];
