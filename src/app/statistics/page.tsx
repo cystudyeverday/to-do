@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { TodoItem, Project, Statistics } from '@/types';
+import { TodoItem, Project, Statistics, DailyCompletion } from '@/types';
 import { StorageManager } from '@/lib/storage';
 import { StatisticsCalculator } from '@/lib/statistics';
 import { format } from 'date-fns';
@@ -39,25 +39,25 @@ export default function StatisticsPage() {
 
   const loadStatistics = async () => {
     try {
-      const projects = StorageManager.getProjects();
-      const items = StorageManager.getItems();
+      const projects = await StorageManager.getProjects();
+      const items = await StorageManager.getItems();
       const statistics = StatisticsCalculator.calculateStatistics(items, projects);
 
       // 计算本周完成的任务
       const now = new Date();
       const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
       const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
-      
-      const weeklyCompletedItems = items.filter(item => 
-        item.status === 'Completed' && 
-        item.completedAt && 
-        item.completedAt >= weekStart && 
+
+      const weeklyCompletedItems = items.filter(item =>
+        item.status === 'Completed' &&
+        item.completedAt &&
+        item.completedAt >= weekStart &&
         item.completedAt < weekEnd
       );
 
       // 更新本周完成的任务数量和每日完成统计
       statistics.weeklyCompletedItems = weeklyCompletedItems.length;
-      
+
       // 重新计算每日完成统计，基于本地数据
       const dailyCompletions = calculateDailyCompletions(weeklyCompletedItems);
       statistics.dailyCompletions = dailyCompletions;
@@ -66,17 +66,37 @@ export default function StatisticsPage() {
     } catch (error) {
       console.error('Error loading statistics:', error);
       // 降级到本地计算
-      const projects = StorageManager.getProjects();
-      const items = StorageManager.getItems();
-      const statistics = StatisticsCalculator.calculateStatistics(items, projects);
-      setStats(statistics);
+      try {
+        const projects = await StorageManager.getProjects();
+        const items = await StorageManager.getItems();
+        const statistics = StatisticsCalculator.calculateStatistics(items, projects);
+        setStats(statistics);
+      } catch (fallbackError) {
+        console.error('Fallback statistics calculation failed:', fallbackError);
+        // 设置空统计以避免页面崩溃
+        setStats({
+          totalItems: 0,
+          completedItems: 0,
+          inProgressItems: 0,
+          notStartedItems: 0,
+          weeklyNewItems: 0,
+          weeklyCompletedItems: 0,
+          averageCompletionTime: 0,
+          projectEfficiency: [],
+          typeDistribution: [
+            { type: 'Feature', count: 0, percentage: 0 },
+            { type: 'Issue', count: 0, percentage: 0 },
+          ],
+          dailyCompletions: [],
+        });
+      }
     }
   };
 
   // 计算每日完成统计
   const calculateDailyCompletions = (weeklyCompletedItems: TodoItem[]) => {
-    const dailyCompletions: { date: string; completedCount: number; }[] = [];
-    
+    const dailyCompletions: DailyCompletion[] = [];
+
     for (let i = 6; i >= 0; i--) {
       const date = new Date();
       date.setDate(date.getDate() - i);
@@ -87,9 +107,14 @@ export default function StatisticsPage() {
         item.completedAt && item.completedAt >= dayStart && item.completedAt < dayEnd
       );
 
+      const features = dayCompletedItems.filter(item => item.type === 'Feature').length;
+      const issues = dayCompletedItems.filter(item => item.type === 'Issue').length;
+
       dailyCompletions.push({
         date: format(dayStart, 'MM/dd'),
-        completedCount: dayCompletedItems.length,
+        completedItems: dayCompletedItems.length,
+        features,
+        issues,
       });
     }
 
@@ -102,11 +127,12 @@ export default function StatisticsPage() {
 
   const summary = StatisticsCalculator.generateSummary(stats);
 
-  // 将typeDistribution对象转换为数组格式以兼容图表组件
-  const typeDistributionData = [
-    { type: 'Feature', count: stats.typeDistribution.Feature, percentage: stats.totalItems > 0 ? Math.round((stats.typeDistribution.Feature / stats.totalItems) * 100) : 0 },
-    { type: 'Issue', count: stats.typeDistribution.Issue, percentage: stats.totalItems > 0 ? Math.round((stats.typeDistribution.Issue / stats.totalItems) * 100) : 0 }
-  ];
+  // typeDistribution 现在已经是数组格式
+  const typeDistributionData = stats.typeDistribution.map(dist => ({
+    type: dist.type,
+    count: dist.count,
+    percentage: dist.percentage,
+  }));
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -138,7 +164,7 @@ export default function StatisticsPage() {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Avg. Completion Time</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.averageCompletionDays} days</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.averageCompletionTime} days</p>
               </div>
             </div>
           </div>
@@ -205,7 +231,7 @@ export default function StatisticsPage() {
                 <XAxis dataKey="date" />
                 <YAxis />
                 <Tooltip />
-                <Bar dataKey="completedCount" fill="#3B82F6" name="Completed" />
+                <Bar dataKey="completedItems" fill="#3B82F6" name="Completed" />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -232,11 +258,11 @@ export default function StatisticsPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-lg font-bold text-gray-900">{project.efficiency}%</p>
+                    <p className="text-lg font-bold text-gray-900">{project.completionRate}%</p>
                     <div className="w-24 h-2 bg-gray-200 rounded-full mt-1">
                       <div
                         className="h-2 bg-blue-600 rounded-full"
-                        style={{ width: `${project.efficiency}%` }}
+                        style={{ width: `${project.completionRate}%` }}
                       />
                     </div>
                   </div>
@@ -261,15 +287,15 @@ export default function StatisticsPage() {
                 <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                   <div className="bg-blue-50 p-3 rounded-lg">
                     <p className="font-medium text-blue-900">Feature Tasks</p>
-                    <p className="text-blue-600">{stats.typeDistribution.Feature} items</p>
+                    <p className="text-blue-600">{stats.typeDistribution.find(d => d.type === 'Feature')?.count || 0} items</p>
                   </div>
                   <div className="bg-orange-50 p-3 rounded-lg">
                     <p className="font-medium text-orange-900">Issue Tasks</p>
-                    <p className="text-orange-600">{stats.typeDistribution.Issue} items</p>
+                    <p className="text-orange-600">{stats.typeDistribution.find(d => d.type === 'Issue')?.count || 0} items</p>
                   </div>
                   <div className="bg-green-50 p-3 rounded-lg">
                     <p className="font-medium text-green-900">Avg. Efficiency</p>
-                    <p className="text-green-600">{stats.averageCompletionDays} days/task</p>
+                    <p className="text-green-600">{stats.averageCompletionTime} days/task</p>
                   </div>
                 </div>
               </div>

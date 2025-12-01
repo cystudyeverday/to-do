@@ -14,7 +14,7 @@ export const CREATE_PROJECT = gql`
 `;
 
 export const UPDATE_PROJECT = gql`
-  mutation UpdateProject($id: String!, $name: String, $description: String) {
+  mutation UpdateProject($id: Int!, $name: String, $description: String) {
     update_projects_by_pk(
       pk_columns: { id: $id }
       _set: { name: $name, description: $description, updated_at: "now()" }
@@ -29,7 +29,7 @@ export const UPDATE_PROJECT = gql`
 `;
 
 export const DELETE_PROJECT = gql`
-  mutation DeleteProject($id: String!) {
+  mutation DeleteProject($id: Int!) {
     delete_projects_by_pk(id: $id) {
       id
     }
@@ -43,7 +43,7 @@ export const CREATE_ITEM = gql`
     $description: String
     $type: String!
     $status: String!
-    $project_id: String!
+    $project_id: Int!
     $module: String
   ) {
     insert_items_one(
@@ -72,14 +72,14 @@ export const CREATE_ITEM = gql`
 
 export const UPDATE_ITEM = gql`
   mutation UpdateItem(
-    $id: String!
+    $id: Int!
     $title: String
     $description: String
     $type: String
     $status: String
-    $project_id: String
+    $project_id: Int
     $module: String
-    $completed_at: timestamptz
+    $completed_at: timestamp
   ) {
     update_items_by_pk(
       pk_columns: { id: $id }
@@ -109,7 +109,7 @@ export const UPDATE_ITEM = gql`
 `;
 
 export const DELETE_ITEM = gql`
-  mutation DeleteItem($id: String!) {
+  mutation DeleteItem($id: Int!) {
     delete_items_by_pk(id: $id) {
       id
     }

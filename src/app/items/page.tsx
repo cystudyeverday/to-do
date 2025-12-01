@@ -26,10 +26,10 @@ export default function ItemsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<ItemStatus | 'all'>('all');
   const [typeFilter, setTypeFilter] = useState<ItemType | 'all'>('all');
-  const [projectFilter, setProjectFilter] = useState<string>('all');
-  const [editingItem, setEditingItem] = useState<string | null>(null);
+  const [projectFilter, setProjectFilter] = useState<number | string>('all');
+  const [editingItem, setEditingItem] = useState<number | null>(null);
   const [editForm, setEditForm] = useState<Partial<TodoItem>>({});
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [isBatchMode, setIsBatchMode] = useState(false);
 
   useEffect(() => {
@@ -40,11 +40,15 @@ export default function ItemsPage() {
     applyFilters();
   }, [items, searchTerm, statusFilter, typeFilter, projectFilter]);
 
-  const loadData = () => {
-    const itemsData = StorageManager.getItems();
-    const projectsData = StorageManager.getProjects();
-    setItems(itemsData);
-    setProjects(projectsData);
+  const loadData = async () => {
+    try {
+      const itemsData = await StorageManager.getItems();
+      const projectsData = await StorageManager.getProjects();
+      setItems(itemsData);
+      setProjects(projectsData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    }
   };
 
   const applyFilters = () => {
@@ -66,7 +70,8 @@ export default function ItemsPage() {
     }
 
     if (projectFilter !== 'all') {
-      filtered = filtered.filter(item => item.projectId === projectFilter);
+      const filterId = typeof projectFilter === 'string' ? parseInt(projectFilter, 10) : projectFilter;
+      filtered = filtered.filter(item => item.projectId === filterId);
     }
 
     setFilteredItems(filtered);
@@ -82,30 +87,38 @@ export default function ItemsPage() {
     });
   };
 
-  const handleSave = (itemId: string) => {
-    const updatedItem = StorageManager.updateItem(itemId, editForm);
-    if (updatedItem) {
-      setItems(prev => prev.map(item => item.id === itemId ? updatedItem : item));
-      setEditingItem(null);
-      setEditForm({});
+  const handleSave = async (itemId: number) => {
+    try {
+      const updatedItem = await StorageManager.updateItem(itemId, editForm);
+      if (updatedItem) {
+        setItems(prev => prev.map(item => item.id === itemId ? updatedItem : item));
+        setEditingItem(null);
+        setEditForm({});
+      }
+    } catch (error) {
+      console.error('Error updating item:', error);
     }
   };
 
-  const handleDelete = (itemId: string) => {
+  const handleDelete = async (itemId: number) => {
     if (confirm('Are you sure you want to delete this task?')) {
-      const success = StorageManager.deleteItem(itemId);
-      if (success) {
-        setItems(prev => prev.filter(item => item.id !== itemId));
-        setSelectedItems(prev => {
-          const newSelected = new Set(prev);
-          newSelected.delete(itemId);
-          return newSelected;
-        });
+      try {
+        const success = await StorageManager.deleteItem(itemId);
+        if (success) {
+          setItems(prev => prev.filter(item => item.id !== itemId));
+          setSelectedItems(prev => {
+            const newSelected = new Set(prev);
+            newSelected.delete(itemId);
+            return newSelected;
+          });
+        }
+      } catch (error) {
+        console.error('Error deleting item:', error);
       }
     }
   };
 
-  const getProjectName = (projectId: string) => {
+  const getProjectName = (projectId: number) => {
     return projects.find(p => p.id === projectId)?.name || 'Unknown Project';
   };
 
@@ -117,7 +130,7 @@ export default function ItemsPage() {
     }
   };
 
-  const handleSelectItem = (itemId: string) => {
+  const handleSelectItem = (itemId: number) => {
     const newSelected = new Set(selectedItems);
     if (newSelected.has(itemId)) {
       newSelected.delete(itemId);
@@ -127,23 +140,27 @@ export default function ItemsPage() {
     setSelectedItems(newSelected);
   };
 
-  const handleBatchDelete = () => {
+  const handleBatchDelete = async () => {
     if (selectedItems.size === 0) {
       alert('Please select items to delete');
       return;
     }
 
     if (confirm(`Are you sure you want to delete ${selectedItems.size} items?`)) {
-      const remainingItems = items.filter(item => !selectedItems.has(item.id));
+      try {
+        for (const itemId of selectedItems) {
+          await StorageManager.deleteItem(itemId);
+        }
 
-      selectedItems.forEach(itemId => {
-        StorageManager.deleteItem(itemId);
-      });
-
-      setItems(remainingItems);
-      setSelectedItems(new Set());
-      setIsBatchMode(false);
-      alert(`Successfully deleted ${selectedItems.size} items`);
+        const remainingItems = items.filter(item => !selectedItems.has(item.id));
+        setItems(remainingItems);
+        setSelectedItems(new Set());
+        setIsBatchMode(false);
+        alert(`Successfully deleted ${selectedItems.size} items`);
+      } catch (error) {
+        console.error('Error deleting items:', error);
+        alert('Failed to delete some items');
+      }
     }
   };
 
@@ -244,12 +261,15 @@ export default function ItemsPage() {
 
             <select
               value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setProjectFilter(value === 'all' ? 'all' : parseInt(value, 10));
+              }}
               className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Projects</option>
               {projects.map(project => (
-                <option key={project.id} value={project.id}>{project.name}</option>
+                <option key={project.id} value={project.id.toString()}>{project.name}</option>
               ))}
             </select>
 
@@ -268,8 +288,8 @@ export default function ItemsPage() {
             <button
               onClick={() => setIsBatchMode(!isBatchMode)}
               className={`px-4 py-2 rounded-md ${isBatchMode
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                ? 'bg-blue-600 text-white hover:bg-blue-700'
+                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
                 }`}
             >
               {isBatchMode ? 'Exit Batch Mode' : 'Batch Mode'}

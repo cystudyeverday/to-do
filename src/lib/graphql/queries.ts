@@ -14,7 +14,7 @@ export const GET_PROJECTS = gql`
 `;
 
 export const GET_PROJECT_BY_ID = gql`
-  query GetProjectById($id: String!) {
+  query GetProjectById($id: Int!) {
     projects_by_pk(id: $id) {
       id
       name
@@ -44,7 +44,7 @@ export const GET_ITEMS = gql`
 `;
 
 export const GET_ITEM_BY_ID = gql`
-  query GetItemById($id: String!) {
+  query GetItemById($id: Int!) {
     items_by_pk(id: $id) {
       id
       title
@@ -61,7 +61,7 @@ export const GET_ITEM_BY_ID = gql`
 `;
 
 export const GET_ITEMS_BY_PROJECT = gql`
-  query GetItemsByProject($projectId: String!) {
+  query GetItemsByProject($projectId: Int!) {
     items(where: { project_id: { _eq: $projectId } }, order_by: { created_at: desc }) {
       id
       title

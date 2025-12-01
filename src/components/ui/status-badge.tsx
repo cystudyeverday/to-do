@@ -10,7 +10,11 @@ interface StatusBadgeProps {
   className?: string;
 }
 
-const statusConfig = {
+const statusConfig: Record<ItemStatus, {
+  icon: typeof Clock;
+  color: string;
+  text: string;
+}> = {
   'Not start': {
     icon: Clock,
     color: 'bg-gray-100 text-gray-700 border-gray-300',
@@ -21,30 +25,20 @@ const statusConfig = {
     color: 'bg-blue-100 text-blue-700 border-blue-300',
     text: '进行中'
   },
-  'Waiting for API': {
-    icon: Settings,
-    color: 'bg-yellow-100 text-yellow-700 border-yellow-300',
-    text: '等待API'
-  },
-  'Build UI': {
-    icon: Wrench,
-    color: 'bg-purple-100 text-purple-700 border-purple-300',
-    text: '构建UI'
-  },
-  'Integration': {
-    icon: Settings,
-    color: 'bg-indigo-100 text-indigo-700 border-indigo-300',
-    text: '集成'
+  'Pending': {
+    icon: Clock,
+    color: 'bg-gray-100 text-gray-700 border-gray-300',
+    text: '待处理'
   },
   'Completed': {
     icon: CheckCircle,
     color: 'bg-green-100 text-green-700 border-green-300',
     text: '已完成'
   },
-  'Fix': {
-    icon: AlertCircle,
-    color: 'bg-red-100 text-red-700 border-red-300',
-    text: '修复'
+  'Archive': {
+    icon: CheckCircle,
+    color: 'bg-gray-100 text-gray-600 border-gray-300',
+    text: '已归档'
   }
 };
 
@@ -62,6 +56,18 @@ const typeConfig = {
 export function StatusBadge({ status, type, className }: StatusBadgeProps) {
   const statusInfo = statusConfig[status];
   const typeInfo = typeConfig[type];
+  
+  // 安全检查：如果状态不存在，使用默认值
+  if (!statusInfo) {
+    console.warn(`Unknown status: ${status}`);
+    return null;
+  }
+  
+  if (!typeInfo) {
+    console.warn(`Unknown type: ${type}`);
+    return null;
+  }
+  
   const StatusIcon = statusInfo.icon;
 
   return (

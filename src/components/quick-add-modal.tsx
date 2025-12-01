@@ -10,7 +10,7 @@ interface QuickAddModalProps {
   onClose: () => void;
   onTaskAdded: (task: TodoItem) => void;
   projects: Project[];
-  defaultProjectId?: string;
+  defaultProjectId?: number | null;
 }
 
 export function QuickAddModal({
@@ -24,7 +24,7 @@ export function QuickAddModal({
   const [description, setDescription] = useState('');
   const [type, setType] = useState<ItemType>('Feature');
   const [status, setStatus] = useState<ItemStatus>('Not start');
-  const [projectId, setProjectId] = useState(defaultProjectId || (projects[0]?.id || ''));
+  const [projectId, setProjectId] = useState<number | ''>(defaultProjectId ?? (projects[0]?.id ?? ''));
   const [module, setModule] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -36,7 +36,7 @@ export function QuickAddModal({
   // 确保 projectId 正确设置
   useEffect(() => {
     if (projects.length > 0) {
-      const newProjectId = defaultProjectId || projects[0].id;
+      const newProjectId = defaultProjectId ?? projects[0].id;
       if (newProjectId !== projectId) {
         setProjectId(newProjectId);
       }
@@ -46,7 +46,7 @@ export function QuickAddModal({
   // 当模态框打开时，确保有默认项目
   useEffect(() => {
     if (isOpen && projects.length > 0 && !projectId) {
-      setProjectId(defaultProjectId || projects[0].id);
+      setProjectId(defaultProjectId ?? projects[0].id);
     }
   }, [isOpen, projects, defaultProjectId, projectId]);
 
@@ -205,7 +205,7 @@ export function QuickAddModal({
     setDescription('');
     setType('Feature');
     setStatus('Not start');
-    setProjectId(defaultProjectId || (projects[0]?.id || ''));
+    setProjectId(defaultProjectId ?? (projects[0]?.id ?? ''));
     setModule('');
     setIsSubmitting(false);
     setBatchInput('');
@@ -236,7 +236,10 @@ export function QuickAddModal({
             </label>
             <select
               value={projectId}
-              onChange={(e) => setProjectId(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                setProjectId(value === '' ? '' : parseInt(value, 10));
+              }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               required
             >
@@ -246,7 +249,7 @@ export function QuickAddModal({
                 <>
                   <option value="">Select a project</option>
                   {projects.map(project => (
-                    <option key={project.id} value={project.id}>
+                    <option key={project.id} value={project.id.toString()}>
                       {project.name}
                     </option>
                   ))}

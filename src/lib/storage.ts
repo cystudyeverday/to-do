@@ -1,117 +1,77 @@
+import { GraphQLStorageManager } from './graphql-storage';
 import { TodoItem, Project } from '@/types';
 
-const STORAGE_KEYS = {
-  PROJECTS: 'todo_projects',
-  ITEMS: 'todo_items',
-} as const;
-
-// 兼容的 UUID 生成函数
-function generateUUID(): string {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-
-  // 降级方案：使用时间戳和随机数生成
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
-
+/**
+ * StorageManager - 兼容层，使用 Hasura GraphQL 作为后端
+ * 保持原有 API 接口，但所有操作都通过 GraphQL API 进行
+ */
 export class StorageManager {
-  static getProjects(): Project[] {
-    if (typeof window === 'undefined') return [];
-    const data = localStorage.getItem(STORAGE_KEYS.PROJECTS);
-    if (!data) return [];
-    return JSON.parse(data).map((p: any) => ({
-      ...p,
-      createdAt: new Date(p.createdAt),
-      updatedAt: new Date(p.updatedAt),
-    }));
+  // 同步方法改为异步，但保持接口兼容
+  static async getProjects(): Promise<Project[]> {
+    return GraphQLStorageManager.getProjects();
   }
 
-  static saveProjects(projects: Project[]): void {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(STORAGE_KEYS.PROJECTS, JSON.stringify(projects));
+  static async saveProjects(projects: Project[]): Promise<void> {
+    // 这个方法在新的 GraphQL 架构中不再需要
+    // 保留以保持兼容性，但不执行任何操作
+    console.warn('saveProjects is deprecated. Use addProject/updateProject instead.');
   }
 
-  static getItems(): TodoItem[] {
-    if (typeof window === 'undefined') return [];
-    const data = localStorage.getItem(STORAGE_KEYS.ITEMS);
-    if (!data) return [];
-    return JSON.parse(data).map((item: any) => ({
-      ...item,
-      createdAt: new Date(item.createdAt),
-      updatedAt: new Date(item.updatedAt),
-      completedAt: item.completedAt ? new Date(item.completedAt) : undefined,
-    }));
+  static async getItems(): Promise<TodoItem[]> {
+    return GraphQLStorageManager.getItems();
   }
 
-  static saveItems(items: TodoItem[]): void {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem(STORAGE_KEYS.ITEMS, JSON.stringify(items));
+  static async saveItems(items: TodoItem[]): Promise<void> {
+    // 这个方法在新的 GraphQL 架构中不再需要
+    // 保留以保持兼容性，但不执行任何操作
+    console.warn('saveItems is deprecated. Use addItem/updateItem instead.');
   }
 
-  static addProject(project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Project {
-    const projects = this.getProjects();
-    const newProject: Project = {
-      ...project,
-      id: generateUUID(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    projects.push(newProject);
-    this.saveProjects(projects);
-    return newProject;
+  static async addProject(project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> {
+    return GraphQLStorageManager.addProject(project);
   }
 
-  static addItem(item: Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>): TodoItem {
-    const items = this.getItems();
-    const newItem: TodoItem = {
-      ...item,
-      id: generateUUID(),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    items.push(newItem);
-    this.saveItems(items);
-    return newItem;
+  static async addItem(item: Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<TodoItem> {
+    return GraphQLStorageManager.addItem(item);
   }
 
-  static updateItem(id: string, updates: Partial<TodoItem>): TodoItem | null {
-    const items = this.getItems();
-    const index = items.findIndex(item => item.id === id);
-    if (index === -1) return null;
-
-    items[index] = {
-      ...items[index],
-      ...updates,
-      updatedAt: new Date(),
-    };
-    this.saveItems(items);
-    return items[index];
+  static async updateItem(id: number | string, updates: Partial<TodoItem>): Promise<TodoItem | null> {
+    const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+    return GraphQLStorageManager.updateItem(numId, updates);
   }
 
-  static deleteItem(id: string): boolean {
-    const items = this.getItems();
-    const filteredItems = items.filter(item => item.id !== id);
-    if (filteredItems.length === items.length) return false;
-    this.saveItems(filteredItems);
-    return true;
+  static async deleteItem(id: number | string): Promise<boolean> {
+    const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+    return GraphQLStorageManager.deleteItem(numId);
   }
 
-  static deleteProject(id: string): boolean {
-    const projects = this.getProjects();
-    const items = this.getItems();
+  static async deleteProject(id: number | string): Promise<boolean> {
+    const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+    return GraphQLStorageManager.deleteProject(numId);
+  }
 
-    const filteredProjects = projects.filter(project => project.id !== id);
-    const filteredItems = items.filter(item => item.projectId !== id);
+  // 新增方法
+  static async getProjectById(id: number | string): Promise<Project | null> {
+    const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+    return GraphQLStorageManager.getProjectById(numId);
+  }
 
-    if (filteredProjects.length === projects.length) return false;
+  static async getItemsByProject(projectId: number | string): Promise<TodoItem[]> {
+    const numId = typeof projectId === 'string' ? parseInt(projectId, 10) : projectId;
+    return GraphQLStorageManager.getItemsByProject(numId);
+  }
 
-    this.saveProjects(filteredProjects);
-    this.saveItems(filteredItems);
-    return true;
+  static async getItemById(id: number | string): Promise<TodoItem | null> {
+    const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+    return GraphQLStorageManager.getItemById(numId);
+  }
+
+  static async updateProject(id: number | string, updates: Partial<Project>): Promise<Project | null> {
+    const numId = typeof id === 'string' ? parseInt(id, 10) : id;
+    return GraphQLStorageManager.updateProject(numId, updates);
+  }
+
+  static async addItems(items: Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>[]): Promise<TodoItem[]> {
+    return GraphQLStorageManager.addItems(items);
   }
 } 

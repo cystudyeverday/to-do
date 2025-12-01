@@ -8,7 +8,7 @@ export async function GET() {
   try {
     const { data } = await apolloClient.query<{
       projects: Array<{
-        id: string;
+        id: number;
         name: string;
         description: string | null;
         created_at: string;
@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     const { data } = await apolloClient.mutate<{
       insert_projects_one: {
-        id: string;
+        id: number;
         name: string;
         description: string | null;
         created_at: string;

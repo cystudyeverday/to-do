@@ -42,10 +42,21 @@ export class StatisticsCalculator {
     };
 
     // 按类型统计
-    const typeDistribution: TypeDistribution = {
-      Feature: items.filter(item => item.type === 'Feature').length,
-      Issue: items.filter(item => item.type === 'Issue').length,
-    };
+    const featureCount = items.filter(item => item.type === 'Feature').length;
+    const issueCount = items.filter(item => item.type === 'Issue').length;
+    const totalCount = items.length;
+    const typeDistribution: TypeDistribution[] = [
+      {
+        type: 'Feature',
+        count: featureCount,
+        percentage: totalCount > 0 ? Math.round((featureCount / totalCount) * 100) : 0,
+      },
+      {
+        type: 'Issue',
+        count: issueCount,
+        percentage: totalCount > 0 ? Math.round((issueCount / totalCount) * 100) : 0,
+      },
+    ];
 
     // 项目效率排名
     const projectEfficiency: ProjectEfficiency[] = projects.map(project => {
@@ -59,9 +70,9 @@ export class StatisticsCalculator {
         projectName: project.name,
         totalItems: totalCount,
         completedItems: completedCount,
-        efficiency: Math.round(efficiency),
+        completionRate: Math.round(efficiency),
       };
-    }).sort((a, b) => b.efficiency - a.efficiency);
+    }).sort((a, b) => b.completionRate - a.completionRate);
 
     // 每日完成统计
     const dailyCompletions: DailyCompletion[] = [];
@@ -75,9 +86,14 @@ export class StatisticsCalculator {
         item.completedAt && item.completedAt >= dayStart && item.completedAt < dayEnd
       );
 
+      const features = dayCompletedItems.filter(item => item.type === 'Feature').length;
+      const issues = dayCompletedItems.filter(item => item.type === 'Issue').length;
+
       dailyCompletions.push({
         date: format(dayStart, 'MM/dd'),
-        completedCount: dayCompletedItems.length,
+        completedItems: dayCompletedItems.length,
+        features,
+        issues,
       });
     }
 
@@ -85,13 +101,12 @@ export class StatisticsCalculator {
       totalItems: items.length,
       completedItems: completedItems.length,
       inProgressItems: inProgressItems.length,
-      pendingItems: pendingItems.length,
+      notStartedItems: pendingItems.length,
       weeklyNewItems,
       weeklyCompletedItems: weeklyCompletedItems.length,
-      averageCompletionDays,
-      statusDistribution,
-      typeDistribution,
+      averageCompletionTime: averageCompletionDays,
       projectEfficiency,
+      typeDistribution,
       dailyCompletions,
     };
   }
@@ -107,13 +122,13 @@ export class StatisticsCalculator {
       summary += `This week: ${stats.weeklyNewItems} new items, ${stats.weeklyCompletedItems} completed. `;
     }
 
-    if (stats.averageCompletionDays > 0) {
-      summary += `Average completion time: ${stats.averageCompletionDays} days. `;
+    if (stats.averageCompletionTime > 0) {
+      summary += `Average completion time: ${stats.averageCompletionTime} days. `;
     }
 
     const topProject = stats.projectEfficiency[0];
-    if (topProject && topProject.efficiency > 0) {
-      summary += `Top performing project: ${topProject.projectName} (${topProject.efficiency}% efficiency).`;
+    if (topProject && topProject.completionRate > 0) {
+      summary += `Top performing project: ${topProject.projectName} (${topProject.completionRate}% efficiency).`;
     }
 
     return summary;

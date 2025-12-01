@@ -10,12 +10,12 @@ export async function GET(request: NextRequest) {
     const projectId = searchParams.get('projectId');
 
     let data: { items: Array<{
-      id: string;
+      id: number;
       title: string;
       description: string | null;
       type: string;
       status: string;
-      project_id: string;
+      project_id: number;
       module: string | null;
       created_at: string;
       updated_at: string;
@@ -26,12 +26,12 @@ export async function GET(request: NextRequest) {
       // 如果提供了 projectId，使用按项目查询
       const result = await apolloClient.query<{
         items: Array<{
-          id: string;
+          id: number;
           title: string;
           description: string | null;
           type: string;
           status: string;
-          project_id: string;
+          project_id: number;
           module: string | null;
           created_at: string;
           updated_at: string;
@@ -39,19 +39,19 @@ export async function GET(request: NextRequest) {
         }>;
       }>({
         query: GET_ITEMS_BY_PROJECT,
-        variables: { projectId },
+        variables: { projectId: parseInt(projectId, 10) },
         fetchPolicy: 'network-only',
       });
       data = result.data;
     } else {
       const result = await apolloClient.query<{
         items: Array<{
-          id: string;
+          id: number;
           title: string;
           description: string | null;
           type: string;
           status: string;
-          project_id: string;
+          project_id: number;
           module: string | null;
           created_at: string;
           updated_at: string;
@@ -100,25 +100,39 @@ export async function POST(request: NextRequest) {
 
     // 批量创建
     if (Array.isArray(items) && items.length > 0) {
-      const objects = items.map((item: any) => ({
-        title: item.title,
-        description: item.description || null,
-        type: item.type,
-        status: item.status,
-        project_id: item.projectId,
-        module: item.module || null,
-        completed_at: item.completedAt || null,
-      }));
+      const objects = items.map((item: any) => {
+        let completed_at = null;
+        if (item.completedAt) {
+          const date = new Date(item.completedAt);
+          // 格式化为 timestamp 格式 (YYYY-MM-DD HH:MM:SS)，不带时区
+          const year = date.getUTCFullYear();
+          const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+          const day = date.getUTCDate().toString().padStart(2, '0');
+          const hours = date.getUTCHours().toString().padStart(2, '0');
+          const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+          const seconds = date.getUTCSeconds().toString().padStart(2, '0');
+          completed_at = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        }
+        return {
+          title: item.title,
+          description: item.description || null,
+          type: item.type,
+          status: item.status,
+          project_id: item.projectId,
+          module: item.module || null,
+          completed_at,
+        };
+      });
 
       const { data } = await apolloClient.mutate<{
         insert_items: {
           returning: Array<{
-            id: string;
+            id: number;
             title: string;
             description: string | null;
             type: string;
             status: string;
-            project_id: string;
+            project_id: number;
             module: string | null;
             created_at: string;
             updated_at: string;
@@ -162,12 +176,12 @@ export async function POST(request: NextRequest) {
 
     const { data } = await apolloClient.mutate<{
       insert_items_one: {
-        id: string;
+        id: number;
         title: string;
         description: string | null;
         type: string;
         status: string;
-        project_id: string;
+        project_id: number;
         module: string | null;
         created_at: string;
         updated_at: string;

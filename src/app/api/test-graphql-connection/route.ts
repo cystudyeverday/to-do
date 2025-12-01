@@ -15,6 +15,8 @@ export async function GET() {
     // 1. 检查环境变量配置
     const hasuraEndpoint = process.env.HASURA_GRAPHQL_ENDPOINT;
     const hasuraSecret = process.env.HASURA_ADMIN_SECRET;
+    console.log('hasuraEndpoint', hasuraEndpoint);
+    console.log('hasuraSecret', hasuraSecret);
 
     if (!hasuraEndpoint || !hasuraSecret) {
       return NextResponse.json({

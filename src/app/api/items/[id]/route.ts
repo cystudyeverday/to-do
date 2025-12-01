@@ -10,15 +10,23 @@ export async function GET(
 ) {
   try {
     const { id } = params;
+    const itemId = parseInt(id, 10);
+
+    if (isNaN(itemId)) {
+      return NextResponse.json(
+        { error: 'Invalid item ID' },
+        { status: 400 }
+      );
+    }
 
     const { data } = await apolloClient.query<{
       items_by_pk: {
-        id: string;
+        id: number;
         title: string;
         description: string | null;
         type: string;
         status: string;
-        project_id: string;
+        project_id: number;
         module: string | null;
         created_at: string;
         updated_at: string;
@@ -26,7 +34,7 @@ export async function GET(
       } | null;
     }>({
       query: GET_ITEM_BY_ID,
-      variables: { id },
+      variables: { id: itemId },
       fetchPolicy: 'network-only',
     });
 
@@ -68,6 +76,15 @@ export async function PUT(
 ) {
   try {
     const { id } = params;
+    const itemId = parseInt(id, 10);
+
+    if (isNaN(itemId)) {
+      return NextResponse.json(
+        { error: 'Invalid item ID' },
+        { status: 400 }
+      );
+    }
+
     const body = await request.json();
     const {
       title,
@@ -81,12 +98,12 @@ export async function PUT(
 
     const { data } = await apolloClient.mutate<{
       update_items_by_pk: {
-        id: string;
+        id: number;
         title: string;
         description: string | null;
         type: string;
         status: string;
-        project_id: string;
+        project_id: number;
         module: string | null;
         created_at: string;
         updated_at: string;
@@ -95,14 +112,24 @@ export async function PUT(
     }>({
       mutation: UPDATE_ITEM,
       variables: {
-        id,
+        id: itemId,
         title,
         description: description !== undefined ? description : null,
         type,
         status,
         project_id: projectId,
         module: module !== undefined ? module : null,
-        completed_at: completedAt ? new Date(completedAt).toISOString() : null,
+        completed_at: completedAt ? (() => {
+          const date = new Date(completedAt);
+          // 格式化为 timestamp 格式 (YYYY-MM-DD HH:MM:SS)，不带时区
+          const year = date.getUTCFullYear();
+          const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+          const day = date.getUTCDate().toString().padStart(2, '0');
+          const hours = date.getUTCHours().toString().padStart(2, '0');
+          const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+          const seconds = date.getUTCSeconds().toString().padStart(2, '0');
+          return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+        })() : null,
       },
     });
 
@@ -144,14 +171,22 @@ export async function DELETE(
 ) {
   try {
     const { id } = params;
+    const itemId = parseInt(id, 10);
+
+    if (isNaN(itemId)) {
+      return NextResponse.json(
+        { error: 'Invalid item ID' },
+        { status: 400 }
+      );
+    }
 
     const { data } = await apolloClient.mutate<{
       delete_items_by_pk: {
-        id: string;
+        id: number;
       } | null;
     }>({
       mutation: DELETE_ITEM,
-      variables: { id },
+      variables: { id: itemId },
     });
 
     if (!data?.delete_items_by_pk) {

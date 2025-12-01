@@ -2,12 +2,12 @@ export type ItemType = 'Feature' | 'Issue';
 export type ItemStatus = 'Not start' | 'On progress' | 'Pending' | 'Completed' | 'Archive';
 
 export interface TodoItem {
-  id: string;
+  id: number;
   title: string;
   description: string;
   type: ItemType;
   status: ItemStatus;
-  projectId: string;
+  projectId: number;
   module?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -15,7 +15,7 @@ export interface TodoItem {
 }
 
 export interface Project {
-  id: string;
+  id: number;
   name: string;
   description?: string;
   createdAt: Date;
@@ -36,7 +36,7 @@ export interface Statistics {
 }
 
 export interface ProjectEfficiency {
-  projectId: string;
+  projectId: number;
   projectName: string;
   completionRate: number;
   totalItems: number;

@@ -9,15 +9,23 @@ export async function GET(
 ) {
   try {
     const { id } = params;
+    const projectId = parseInt(id, 10);
+
+    if (isNaN(projectId)) {
+      return NextResponse.json(
+        { error: 'Invalid project ID' },
+        { status: 400 }
+      );
+    }
 
     const { data } = await apolloClient.query<{
       items: Array<{
-        id: string;
+        id: number;
         title: string;
         description: string | null;
         type: string;
         status: string;
-        project_id: string;
+        project_id: number;
         module: string | null;
         created_at: string;
         updated_at: string;
@@ -25,7 +33,7 @@ export async function GET(
       }>;
     }>({
       query: GET_ITEMS_BY_PROJECT,
-      variables: { projectId: id },
+      variables: { projectId },
       fetchPolicy: 'network-only',
     });
 

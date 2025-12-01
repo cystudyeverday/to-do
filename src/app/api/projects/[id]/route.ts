@@ -10,10 +10,18 @@ export async function GET(
 ) {
   try {
     const { id } = params;
+    const projectId = parseInt(id, 10);
+    
+    if (isNaN(projectId)) {
+      return NextResponse.json(
+        { error: 'Invalid project ID' },
+        { status: 400 }
+      );
+    }
 
     const { data } = await apolloClient.query<{
       projects_by_pk: {
-        id: string;
+        id: number;
         name: string;
         description: string | null;
         created_at: string;
@@ -21,7 +29,7 @@ export async function GET(
       } | null;
     }>({
       query: GET_PROJECT_BY_ID,
-      variables: { id },
+      variables: { id: projectId },
       fetchPolicy: 'network-only',
     });
 
@@ -58,12 +66,21 @@ export async function PUT(
 ) {
   try {
     const { id } = params;
+    const projectId = parseInt(id, 10);
+    
+    if (isNaN(projectId)) {
+      return NextResponse.json(
+        { error: 'Invalid project ID' },
+        { status: 400 }
+      );
+    }
+
     const body = await request.json();
     const { name, description } = body;
 
     const { data } = await apolloClient.mutate<{
       update_projects_by_pk: {
-        id: string;
+        id: number;
         name: string;
         description: string | null;
         created_at: string;
@@ -72,7 +89,7 @@ export async function PUT(
     }>({
       mutation: UPDATE_PROJECT,
       variables: {
-        id,
+        id: projectId,
         name,
         description: description !== undefined ? description : null,
       },
@@ -111,14 +128,22 @@ export async function DELETE(
 ) {
   try {
     const { id } = params;
+    const projectId = parseInt(id, 10);
+    
+    if (isNaN(projectId)) {
+      return NextResponse.json(
+        { error: 'Invalid project ID' },
+        { status: 400 }
+      );
+    }
 
     const { data } = await apolloClient.mutate<{
       delete_projects_by_pk: {
-        id: string;
+        id: number;
       } | null;
     }>({
       mutation: DELETE_PROJECT,
-      variables: { id },
+      variables: { id: projectId },
     });
 
     if (!data?.delete_projects_by_pk) {

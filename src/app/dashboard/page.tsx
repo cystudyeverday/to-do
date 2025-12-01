@@ -26,17 +26,17 @@ import {
 export default function DashboardPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [items, setItems] = useState<TodoItem[]>([]);
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set());
+  const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState(false);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-  const [draggedItem, setDraggedItem] = useState<string | null>(null);
-  const [dragOverItem, setDragOverItem] = useState<string | null>(null);
-  const [statusDropdownOpen, setStatusDropdownOpen] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
+  const [draggedItem, setDraggedItem] = useState<number | null>(null);
+  const [dragOverItem, setDragOverItem] = useState<number | null>(null);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState<number | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
-  const [projectItemOrder, setProjectItemOrder] = useState<Record<string, string[]>>({});
-  const [projectFilters, setProjectFilters] = useState<Record<string, { filterType: 'all' | 'Feature' | 'Issue', sortBy: 'status' | 'type' | 'updatedAt' | 'createdAt' | 'module' }>>({});
-  const [archivingProject, setArchivingProject] = useState<string | null>(null);
+  const [projectItemOrder, setProjectItemOrder] = useState<Record<number, number[]>>({});
+  const [projectFilters, setProjectFilters] = useState<Record<number, { filterType: 'all' | 'Feature' | 'Issue', sortBy: 'status' | 'type' | 'updatedAt' | 'createdAt' | 'module' }>>({});
+  const [archivingProject, setArchivingProject] = useState<number | null>(null);
 
   useEffect(() => {
     loadData();
@@ -57,8 +57,8 @@ export default function DashboardPage() {
 
   const loadData = async () => {
     try {
-      const projectsData = StorageManager.getProjects();
-      const itemsData = StorageManager.getItems();
+      const projectsData = await StorageManager.getProjects();
+      const itemsData = await StorageManager.getItems();
 
       // 为现有任务添加默认module字段（如果没有的话）
       const updatedItems = itemsData.map(item => ({
@@ -70,7 +70,7 @@ export default function DashboardPage() {
       if (updatedItems.length !== itemsData.length ||
         updatedItems.some((item, i) => item.module !== (itemsData[i] as any).module)) {
         for (const item of updatedItems) {
-          StorageManager.updateItem(item.id, { module: item.module });
+          await StorageManager.updateItem(item.id, { module: item.module });
         }
       }
 
@@ -78,7 +78,7 @@ export default function DashboardPage() {
       setItems(updatedItems);
 
       // 初始化项目排序状态
-      const orderState: Record<string, string[]> = {};
+      const orderState: Record<number, number[]> = {};
       projectsData.forEach(project => {
         const projectItems = updatedItems.filter(item => item.projectId === project.id);
         orderState[project.id] = projectItems.map(item => item.id);
@@ -89,7 +89,7 @@ export default function DashboardPage() {
     }
   };
 
-  const toggleProject = (projectId: string) => {
+  const toggleProject = (projectId: number) => {
     const newExpanded = new Set(expandedProjects);
     if (newExpanded.has(projectId)) {
       newExpanded.delete(projectId);
@@ -99,7 +99,7 @@ export default function DashboardPage() {
     setExpandedProjects(newExpanded);
   };
 
-  const getProjectItems = (projectId: string) => {
+  const getProjectItems = (projectId: number) => {
     let projectItems = items.filter(item => item.projectId === projectId && item.status !== 'Archive' as ItemStatus);
 
     // 获取项目的过滤设置，如果没有则使用默认值
@@ -252,9 +252,9 @@ export default function DashboardPage() {
     }));
   };
 
-  const handleModuleUpdate = async (itemId: string, newModule: string) => {
+  const handleModuleUpdate = async (itemId: number, newModule: string) => {
     try {
-      const updatedItem = StorageManager.updateItem(itemId, { module: newModule });
+      const updatedItem = await StorageManager.updateItem(itemId, { module: newModule });
       if (updatedItem) {
         const updatedItems = items.map(item =>
           item.id === itemId ? updatedItem : item
@@ -266,7 +266,7 @@ export default function DashboardPage() {
     }
   };
 
-  const handleArchiveProject = async (projectId: string) => {
+  const handleArchiveProject = async (projectId: number) => {
     try {
       setArchivingProject(projectId);
       // 归档功能暂时使用本地存储
@@ -274,7 +274,7 @@ export default function DashboardPage() {
       let archivedCount = 0;
 
       for (const item of projectItems) {
-        const updated = StorageManager.updateItem(item.id, { status: 'Archive' as ItemStatus });
+        const updated = await StorageManager.updateItem(item.id, { status: 'Archive' as ItemStatus });
         if (updated) archivedCount++;
       }
 
@@ -301,7 +301,7 @@ export default function DashboardPage() {
     if (!projectToDelete) return;
 
     try {
-      const success = StorageManager.deleteProject(projectToDelete.id);
+      const success = await StorageManager.deleteProject(projectToDelete.id);
       if (success) {
         setProjects(prev => prev.filter(p => p.id !== projectToDelete.id));
         setItems(prev => prev.filter(item => item.projectId !== projectToDelete.id));
@@ -319,12 +319,12 @@ export default function DashboardPage() {
     setProjectToDelete(null);
   };
 
-  const handleDragStart = (e: React.DragEvent, itemId: string) => {
+  const handleDragStart = (e: React.DragEvent, itemId: number) => {
     setDraggedItem(itemId);
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e: React.DragEvent, itemId: string) => {
+  const handleDragOver = (e: React.DragEvent, itemId: number) => {
     e.preventDefault();
     if (draggedItem && draggedItem !== itemId) {
       setDragOverItem(itemId);
@@ -335,7 +335,7 @@ export default function DashboardPage() {
     setDragOverItem(null);
   };
 
-  const handleDrop = async (e: React.DragEvent, targetItemId: string) => {
+  const handleDrop = async (e: React.DragEvent, targetItemId: number) => {
     e.preventDefault();
     if (!draggedItem || draggedItem === targetItemId) return;
 
@@ -373,7 +373,7 @@ export default function DashboardPage() {
 
     // 更新项目的更新时间
     try {
-      const updatedItem = StorageManager.updateItem(draggedItem, { updatedAt: new Date() });
+      const updatedItem = await StorageManager.updateItem(draggedItem, { updatedAt: new Date() });
       if (updatedItem) {
         const updatedItems = items.map(item =>
           item.id === draggedItem ? updatedItem : item
@@ -418,13 +418,13 @@ export default function DashboardPage() {
     }
   };
 
-  const handleStatusClick = (itemId: string) => {
+  const handleStatusClick = (itemId: number) => {
     setStatusDropdownOpen(statusDropdownOpen === itemId ? null : itemId);
   };
 
-  const handleStatusChange = async (itemId: string, newStatus: ItemStatus) => {
+  const handleStatusChange = async (itemId: number, newStatus: ItemStatus) => {
     try {
-      const updatedItem = StorageManager.updateItem(itemId, { status: newStatus });
+      const updatedItem = await StorageManager.updateItem(itemId, { status: newStatus });
       if (updatedItem) {
         setItems(prev => prev.map(item => item.id === itemId ? updatedItem : item));
         setStatusDropdownOpen(null);
@@ -435,7 +435,7 @@ export default function DashboardPage() {
     }
   };
 
-  const updateProjectFilter = (projectId: string, filterType: 'all' | 'Feature' | 'Issue', sortBy: 'status' | 'type' | 'updatedAt' | 'createdAt' | 'module') => {
+  const updateProjectFilter = (projectId: number, filterType: 'all' | 'Feature' | 'Issue', sortBy: 'status' | 'type' | 'updatedAt' | 'createdAt' | 'module') => {
     console.log('Updating project filter:', { projectId, filterType, sortBy });
     setProjectFilters(prev => {
       const newFilters = {
@@ -532,8 +532,8 @@ export default function DashboardPage() {
                 <AlertCircle className="w-6 h-6 text-yellow-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Pending</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.pendingItems}</p>
+                <p className="text-sm font-medium text-gray-600">Not Started</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.notStartedItems}</p>
               </div>
             </div>
           </div>
