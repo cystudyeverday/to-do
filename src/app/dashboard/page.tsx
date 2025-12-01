@@ -256,10 +256,8 @@ export default function DashboardPage() {
     try {
       const updatedItem = await StorageManager.updateItem(itemId, { module: newModule });
       if (updatedItem) {
-        const updatedItems = items.map(item =>
-          item.id === itemId ? updatedItem : item
-        );
-        setItems(updatedItems);
+        // GraphQL 现在只更新提供的字段，返回完整对象，所以直接使用返回的数据
+        setItems(prev => prev.map(item => item.id === itemId ? updatedItem : item));
       }
     } catch (error) {
       console.error('Error updating module:', error);
@@ -375,10 +373,8 @@ export default function DashboardPage() {
     try {
       const updatedItem = await StorageManager.updateItem(draggedItem, { updatedAt: new Date() });
       if (updatedItem) {
-        const updatedItems = items.map(item =>
-          item.id === draggedItem ? updatedItem : item
-        );
-        setItems(updatedItems);
+        // GraphQL 现在只更新提供的字段，返回完整对象，所以直接使用返回的数据
+        setItems(prev => prev.map(item => item.id === draggedItem ? updatedItem : item));
       }
     } catch (error) {
       console.error('Error updating item order:', error);
@@ -426,6 +422,7 @@ export default function DashboardPage() {
     try {
       const updatedItem = await StorageManager.updateItem(itemId, { status: newStatus });
       if (updatedItem) {
+        // GraphQL 现在只更新提供的字段，返回完整对象，所以直接使用返回的数据
         setItems(prev => prev.map(item => item.id === itemId ? updatedItem : item));
         setStatusDropdownOpen(null);
       }

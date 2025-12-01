@@ -9,18 +9,20 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
 
-    let data: { items: Array<{
-      id: number;
-      title: string;
-      description: string | null;
-      type: string;
-      status: string;
-      project_id: number;
-      module: string | null;
-      created_at: string;
-      updated_at: string;
-      completed_at: string | null;
-    }> };
+    let data: {
+      items: Array<{
+        id: number;
+        title: string;
+        description: string | null;
+        type: string;
+        status: string;
+        project_id: number;
+        module: string | null;
+        created_at: string;
+        updated_at: string;
+        completed_at: string | null;
+      }>
+    };
 
     if (projectId) {
       // 如果提供了 projectId，使用按项目查询
@@ -42,6 +44,9 @@ export async function GET(request: NextRequest) {
         variables: { projectId: parseInt(projectId, 10) },
         fetchPolicy: 'network-only',
       });
+      if (!result.data) {
+        throw new Error('No data returned from query');
+      }
       data = result.data;
     } else {
       const result = await apolloClient.query<{
@@ -61,11 +66,10 @@ export async function GET(request: NextRequest) {
         query: GET_ITEMS,
         fetchPolicy: 'network-only',
       });
+      if (!result.data) {
+        throw new Error('No data returned from query');
+      }
       data = result.data;
-    }
-
-    if (!data) {
-      throw new Error('No data returned from query');
     }
 
     // 转换数据格式以匹配应用类型
@@ -101,7 +105,7 @@ export async function POST(request: NextRequest) {
     // 批量创建
     if (Array.isArray(items) && items.length > 0) {
       const objects = items.map((item: any) => {
-        let completed_at = null;
+        let completed_at: string | null = null;
         if (item.completedAt) {
           const date = new Date(item.completedAt);
           // 格式化为 timestamp 格式 (YYYY-MM-DD HH:MM:SS)，不带时区

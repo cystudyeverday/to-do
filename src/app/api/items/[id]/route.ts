@@ -96,6 +96,52 @@ export async function PUT(
       completedAt,
     } = body;
 
+    // 构建只包含要更新的字段的 set 对象（merge 行为）
+    const setObject: any = {};
+
+    // 总是更新 updated_at 时间戳为当前时间
+    const now = new Date();
+    const year = now.getUTCFullYear();
+    const month = (now.getUTCMonth() + 1).toString().padStart(2, '0');
+    const day = now.getUTCDate().toString().padStart(2, '0');
+    const hours = now.getUTCHours().toString().padStart(2, '0');
+    const minutes = now.getUTCMinutes().toString().padStart(2, '0');
+    const seconds = now.getUTCSeconds().toString().padStart(2, '0');
+    setObject.updated_at = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+
+    if (title !== undefined && title !== null && title.trim() !== '') {
+      setObject.title = title;
+    }
+    if (description !== undefined) {
+      setObject.description = description || null;
+    }
+    if (type !== undefined && type !== null) {
+      setObject.type = type;
+    }
+    if (status !== undefined && status !== null) {
+      setObject.status = status;
+    }
+    if (projectId !== undefined && projectId !== null) {
+      setObject.project_id = projectId;
+    }
+    if (module !== undefined) {
+      setObject.module = module || null;
+    }
+    if (completedAt !== undefined) {
+      if (completedAt) {
+        const date = new Date(completedAt);
+        const year = date.getUTCFullYear();
+        const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
+        const day = date.getUTCDate().toString().padStart(2, '0');
+        const hours = date.getUTCHours().toString().padStart(2, '0');
+        const minutes = date.getUTCMinutes().toString().padStart(2, '0');
+        const seconds = date.getUTCSeconds().toString().padStart(2, '0');
+        setObject.completed_at = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+      } else {
+        setObject.completed_at = null;
+      }
+    }
+
     const { data } = await apolloClient.mutate<{
       update_items_by_pk: {
         id: number;
@@ -113,23 +159,7 @@ export async function PUT(
       mutation: UPDATE_ITEM,
       variables: {
         id: itemId,
-        title,
-        description: description !== undefined ? description : null,
-        type,
-        status,
-        project_id: projectId,
-        module: module !== undefined ? module : null,
-        completed_at: completedAt ? (() => {
-          const date = new Date(completedAt);
-          // 格式化为 timestamp 格式 (YYYY-MM-DD HH:MM:SS)，不带时区
-          const year = date.getUTCFullYear();
-          const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
-          const day = date.getUTCDate().toString().padStart(2, '0');
-          const hours = date.getUTCHours().toString().padStart(2, '0');
-          const minutes = date.getUTCMinutes().toString().padStart(2, '0');
-          const seconds = date.getUTCSeconds().toString().padStart(2, '0');
-          return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-        })() : null,
+        set: setObject,
       },
     });
 

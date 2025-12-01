@@ -73,26 +73,11 @@ export const CREATE_ITEM = gql`
 export const UPDATE_ITEM = gql`
   mutation UpdateItem(
     $id: Int!
-    $title: String
-    $description: String
-    $type: String
-    $status: String
-    $project_id: Int
-    $module: String
-    $completed_at: timestamp
+    $set: items_set_input!
   ) {
     update_items_by_pk(
       pk_columns: { id: $id }
-      _set: {
-        title: $title
-        description: $description
-        type: $type
-        status: $status
-        project_id: $project_id
-        module: $module
-        completed_at: $completed_at
-        updated_at: "now()"
-      }
+      _set: $set
     ) {
       id
       title

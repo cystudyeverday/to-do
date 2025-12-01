@@ -338,53 +338,55 @@ export class GraphQLStorageManager {
 
   static async updateItem(id: number, updates: Partial<TodoItem>): Promise<TodoItem | null> {
     try {
-      // 构建只包含要更新的字段的 variables 对象
-      // 注意：只包含实际要更新的字段，不包含 null 或 undefined 值
-      const variables: any = {
-        id: typeof id === 'string' ? parseInt(id, 10) : id,
-      };
+      const numId = typeof id === 'string' ? parseInt(id, 10) : id;
 
-      // 只添加实际要更新的字段，并且确保非空字段不为 null
-      // title 是 NOT NULL 字段，所以必须确保不为 null 或空字符串
+      // 构建只包含要更新的字段的 _set 对象
+      // 只添加实际要更新的字段，未包含的字段不会被更新（merge 行为）
+      const setObject: any = {};
+
+      // 只添加实际要更新的字段
       if (updates.title !== undefined && updates.title !== null && updates.title.trim() !== '') {
-        variables.title = updates.title;
+        setObject.title = updates.title;
       }
-      // description 可以为 null
       if (updates.description !== undefined) {
-        variables.description = updates.description || null;
+        setObject.description = updates.description || null;
       }
-      // type 是 NOT NULL 字段
       if (updates.type !== undefined && updates.type !== null) {
-        variables.type = updates.type;
+        setObject.type = updates.type;
       }
-      // status 是 NOT NULL 字段
       if (updates.status !== undefined && updates.status !== null) {
-        variables.status = updates.status;
+        setObject.status = updates.status;
       }
-      // project_id 是 NOT NULL 字段
       if (updates.projectId !== undefined && updates.projectId !== null) {
-        variables.project_id = updates.projectId;
+        setObject.project_id = updates.projectId;
       }
-      // module 可以为 null
       if (updates.module !== undefined) {
-        variables.module = updates.module || null;
+        setObject.module = updates.module || null;
       }
-      // completed_at 可以为 null，格式为 timestamp (YYYY-MM-DD HH:MM:SS)
       if (updates.completedAt !== undefined) {
         if (updates.completedAt) {
           const date = new Date(updates.completedAt);
-          // 格式化为 timestamp 格式 (YYYY-MM-DD HH:MM:SS)，不带时区
           const year = date.getUTCFullYear();
           const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
           const day = date.getUTCDate().toString().padStart(2, '0');
           const hours = date.getUTCHours().toString().padStart(2, '0');
           const minutes = date.getUTCMinutes().toString().padStart(2, '0');
           const seconds = date.getUTCSeconds().toString().padStart(2, '0');
-          variables.completed_at = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+          setObject.completed_at = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
         } else {
-          variables.completed_at = null;
+          setObject.completed_at = null;
         }
       }
+
+      // 总是更新 updated_at 时间戳为当前时间
+      const now = new Date();
+      const year = now.getUTCFullYear();
+      const month = (now.getUTCMonth() + 1).toString().padStart(2, '0');
+      const day = now.getUTCDate().toString().padStart(2, '0');
+      const hours = now.getUTCHours().toString().padStart(2, '0');
+      const minutes = now.getUTCMinutes().toString().padStart(2, '0');
+      const seconds = now.getUTCSeconds().toString().padStart(2, '0');
+      setObject.updated_at = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 
       const { data } = await apolloClient.mutate<{
         update_items_by_pk: {
@@ -401,7 +403,10 @@ export class GraphQLStorageManager {
         } | null;
       }>({
         mutation: UPDATE_ITEM,
-        variables,
+        variables: {
+          id: numId,
+          set: setObject,
+        },
       });
 
       if (!data?.update_items_by_pk) return null;
