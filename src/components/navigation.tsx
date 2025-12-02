@@ -39,15 +39,31 @@ export function Navigation() {
   const isDashboard = pathname === '/dashboard';
 
   useEffect(() => {
-    if (isDashboard) {
-      loadProjects();
-      loadItems();
-    }
+    // Always load projects and items to keep menu up to date
+    loadProjects();
+    loadItems();
+    
     // Expand submenu if on dashboard or if a project is selected
     if (isDashboard || selectedProjectId !== null) {
       setIsDashboardExpanded(true);
     }
   }, [isDashboard, selectedProjectId]);
+
+  // Refresh data periodically and when pathname changes to catch updates
+  useEffect(() => {
+    const refreshData = () => {
+      loadProjects();
+      loadItems();
+    };
+
+    // Refresh immediately when pathname changes
+    refreshData();
+
+    // Set up periodic refresh every 2 seconds to catch updates from other tabs/components
+    const interval = setInterval(refreshData, 2000);
+
+    return () => clearInterval(interval);
+  }, [pathname]);
 
   const loadProjects = async () => {
     try {
