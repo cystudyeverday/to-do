@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { TodoItem, ItemStatus, ItemType, Project } from '@/types';
+import { TodoItem, ItemStatus, Project } from '@/types';
 import { StorageManager } from '@/lib/storage';
 import { X, Plus, Save, List, FileText } from 'lucide-react';
 
@@ -22,7 +22,6 @@ export function QuickAddModal({
 }: QuickAddModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [type, setType] = useState<ItemType>('Feature');
   const [status, setStatus] = useState<ItemStatus>('Not start');
   const [projectId, setProjectId] = useState<number | ''>(defaultProjectId ?? (projects[0]?.id ?? ''));
   const [module, setModule] = useState('');
@@ -112,10 +111,10 @@ export function QuickAddModal({
       setIsSubmitting(true);
 
       try {
-        const newTask = StorageManager.addItem({
+        const newTask = await StorageManager.addItem({
           title: title.trim(),
           description: description.trim(),
-          type,
+          type: 'Feature', // Default type, not shown in UI
           status,
           projectId,
           module: module.trim() || 'Other'
@@ -169,10 +168,10 @@ export function QuickAddModal({
             const taskModule = classifyModule(taskTitle);
             console.log(`Adding task: "${taskTitle}" to module: ${taskModule}`);
 
-            const newTask = StorageManager.addItem({
+            const newTask = await StorageManager.addItem({
               title: taskTitle.trim(),
               description: taskTitle.trim(), // 使用标题作为描述
-              type,
+              type: 'Feature', // Default type, not shown in UI
               status,
               projectId,
               module: taskModule
@@ -203,7 +202,6 @@ export function QuickAddModal({
   const handleClose = () => {
     setTitle('');
     setDescription('');
-    setType('Feature');
     setStatus('Not start');
     setProjectId(defaultProjectId ?? (projects[0]?.id ?? ''));
     setModule('');
@@ -377,39 +375,23 @@ user management view only view for non-CMP user"
             </>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Type
-              </label>
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value as ItemType)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="Feature">Feature</option>
-                <option value="Issue">Issue</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Status
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as ItemStatus)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="Not start">Not Started</option>
-                <option value="On progress">In Progress</option>
-                <option value="Waiting for API">Waiting for API</option>
-                <option value="Build UI">Build UI</option>
-                <option value="Integration">Integration</option>
-                <option value="Completed">Completed</option>
-                <option value="Fix">Fix</option>
-              </select>
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Status
+            </label>
+            <select
+              value={status}
+              onChange={(e) => setStatus(e.target.value as ItemStatus)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="Not start">Not Started</option>
+              <option value="On progress">In Progress</option>
+              <option value="Waiting for API">Waiting for API</option>
+              <option value="Build UI">Build UI</option>
+              <option value="Integration">Integration</option>
+              <option value="Completed">Completed</option>
+              <option value="Fix">Fix</option>
+            </select>
           </div>
 
           <div className="flex items-center justify-end space-x-3 pt-4">

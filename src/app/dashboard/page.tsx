@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { TodoItem, Project, ItemStatus } from '@/types';
 import { StorageManager } from '@/lib/storage';
 import { StatisticsCalculator } from '@/lib/statistics';
@@ -17,26 +18,36 @@ import {
   ChevronRight,
   CheckCircle,
   Clock,
-  GripVertical,
   AlertCircle,
   BarChart3,
-  Archive
+  Archive,
+  Edit2,
+  X,
+  Check
 } from 'lucide-react';
 
 export default function DashboardPage() {
+  const searchParams = useSearchParams();
   const [projects, setProjects] = useState<Project[]>([]);
   const [items, setItems] = useState<TodoItem[]>([]);
   const [expandedProjects, setExpandedProjects] = useState<Set<number>>(new Set());
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isQuickAddModalOpen, setIsQuickAddModalOpen] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
-  const [draggedItem, setDraggedItem] = useState<number | null>(null);
-  const [dragOverItem, setDragOverItem] = useState<number | null>(null);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState<number | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
   const [projectItemOrder, setProjectItemOrder] = useState<Record<number, number[]>>({});
-  const [projectFilters, setProjectFilters] = useState<Record<number, { filterType: 'all' | 'Feature' | 'Issue', sortBy: 'status' | 'type' | 'updatedAt' | 'createdAt' | 'module' }>>({});
+  const [projectFilters, setProjectFilters] = useState<Record<number, { sortBy: 'status' | 'updatedAt' | 'createdAt' | 'module' }>>({});
   const [archivingProject, setArchivingProject] = useState<number | null>(null);
+  const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
+  const [editingProjectName, setEditingProjectName] = useState<string>('');
+  const [editingItemId, setEditingItemId] = useState<number | null>(null);
+  const [editingItemTitle, setEditingItemTitle] = useState<string>('');
+  const [showCompletedItems, setShowCompletedItems] = useState<Record<number, boolean>>({});
+  const [itemOrderKeys, setItemOrderKeys] = useState<Record<number, number>>({});
+
+  // Get selected project from URL params
+  const selectedProjectFilter = searchParams.get('project') ? parseInt(searchParams.get('project')!, 10) : null;
 
   useEffect(() => {
     loadData();
@@ -84,6 +95,10 @@ export default function DashboardPage() {
         orderState[project.id] = projectItems.map(item => item.id);
       });
       setProjectItemOrder(orderState);
+
+      // 默认展开所有项目
+      const allProjectIds = new Set(projectsData.map(project => project.id));
+      setExpandedProjects(allProjectIds);
     } catch (error) {
       console.error('Error loading data:', error);
     }
@@ -99,24 +114,26 @@ export default function DashboardPage() {
     setExpandedProjects(newExpanded);
   };
 
-  const getProjectItems = (projectId: number) => {
+  const getProjectItems = (projectId: number, includeCompleted: boolean = true) => {
     let projectItems = items.filter(item => item.projectId === projectId && item.status !== 'Archive' as ItemStatus);
 
+    // Separate completed and unfinished items
+    const unfinishedItems = projectItems.filter(item => item.status !== 'Completed');
+    const completedItems = projectItems.filter(item => item.status === 'Completed');
+
+    // If not showing completed, only return unfinished items
+    if (!includeCompleted) {
+      projectItems = unfinishedItems;
+    }
+
     // 获取项目的过滤设置，如果没有则使用默认值
-    const projectFilter = projectFilters[projectId] || { filterType: 'all', sortBy: 'status' };
+    const projectFilter = projectFilters[projectId] || { sortBy: 'status' };
 
     console.log('Getting project items for:', projectId, 'with filter:', projectFilter);
-
-    // 应用类型过滤
-    if (projectFilter.filterType !== 'all') {
-      projectItems = projectItems.filter(item => item.type === projectFilter.filterType);
-      console.log('After filtering by type:', projectFilter.filterType, 'items count:', projectItems.length);
-    }
 
     // 按选择的排序方式排序
     console.log('Sorting by:', projectFilter.sortBy, 'items before sort:', projectItems.map(item => ({
       title: item.title,
-      type: item.type,
       status: item.status,
       module: (item as any).module || 'Other',
       updatedAt: item.updatedAt,
@@ -137,35 +154,14 @@ export default function DashboardPage() {
           const bPriority = statusPriority[b.status as keyof typeof statusPriority] || 0;
           return aPriority - bPriority;
 
-        case 'type':
-          // Type：按类型排序，相同类型内按状态排序
-          // Feature 应该排在 Issue 前面
-          if (a.type !== b.type) {
-            return a.type === 'Feature' ? -1 : 1;
-          }
-          // 相同类型内按状态排序，Not start 排第一，Completed 排最后
-          const statusPriorityForType = {
-            'Not start': 0,
-            'On progress': 1,
-            'Pending': 2,
-            'Completed': 3
-          };
-          const aStatusPriority = statusPriorityForType[a.status as keyof typeof statusPriorityForType] || 0;
-          const bStatusPriority = statusPriorityForType[b.status as keyof typeof statusPriorityForType] || 0;
-          return aStatusPriority - bStatusPriority;
-
         case 'module':
-          // Module：按 module 排序，相同 module 内按类型排序，再按状态排序
+          // Module：按 module 排序，相同 module 内按状态排序
           const moduleA = (a as any).module || 'Other';
           const moduleB = (b as any).module || 'Other';
           if (moduleA !== moduleB) {
             return moduleA.localeCompare(moduleB);
           }
-          // 相同 module 内按类型排序
-          if (a.type !== b.type) {
-            return a.type === 'Feature' ? -1 : 1;
-          }
-          // 相同类型内按状态排序，Not start 排第一，Completed 排最后
+          // 相同 module 内按状态排序，Not start 排第一，Completed 排最后
           const statusPriorityForModule = {
             'Not start': 0,
             'On progress': 1,
@@ -189,8 +185,8 @@ export default function DashboardPage() {
       }
     });
 
-    console.log('Sorted items by:', projectFilter.sortBy, 'items:', sortedItems.map(item => ({ title: item.title, type: item.type, status: item.status })));
-    return sortedItems;
+    console.log('Sorted items by:', projectFilter.sortBy, 'items:', sortedItems.map(item => ({ title: item.title, status: item.status })));
+    return { unfinished: unfinishedItems, completed: completedItems, all: sortedItems };
   };
 
   const getProjectsByModule = () => {
@@ -236,6 +232,8 @@ export default function DashboardPage() {
 
   const handleProjectAdded = (newProject: Project) => {
     setProjects(prev => [...prev, newProject]);
+    // 自动展开新添加的项目
+    setExpandedProjects(prev => new Set([...prev, newProject.id]));
   };
 
   const handleItemUpdate = (updatedItem: TodoItem) => {
@@ -243,6 +241,14 @@ export default function DashboardPage() {
   };
 
   const handleTaskAdded = (newTask: TodoItem) => {
+    // 确保项目已展开，以便新任务可见
+    setExpandedProjects(prev => {
+      const newExpanded = new Set(prev);
+      newExpanded.add(newTask.projectId);
+      return newExpanded;
+    });
+
+    // 添加新任务到状态
     setItems(prev => [...prev, newTask]);
 
     // 更新排序状态，将新任务添加到项目排序的末尾
@@ -267,8 +273,8 @@ export default function DashboardPage() {
   const handleArchiveProject = async (projectId: number) => {
     try {
       setArchivingProject(projectId);
-      // 归档功能暂时使用本地存储
-      const projectItems = items.filter(item => item.projectId === projectId && item.status === 'Completed');
+      // Archive all items in the project (should all be completed when button is enabled)
+      const projectItems = items.filter(item => item.projectId === projectId && item.status !== 'Archive' as ItemStatus);
       let archivedCount = 0;
 
       for (const item of projectItems) {
@@ -279,13 +285,13 @@ export default function DashboardPage() {
       if (archivedCount > 0) {
         // 重新加载数据以反映归档状态
         loadData();
-        alert(`Successfully archived ${archivedCount} completed items`);
+        alert(`Successfully archived ${archivedCount} items. Project archived.`);
       } else {
-        alert('No completed items to archive');
+        alert('No items to archive');
       }
     } catch (error) {
       console.error('Archive error:', error);
-      alert('Failed to archive items');
+      alert('Failed to archive project');
     } finally {
       setArchivingProject(null);
     }
@@ -293,6 +299,70 @@ export default function DashboardPage() {
 
   const handleDeleteProject = (project: Project) => {
     setProjectToDelete(project);
+  };
+
+  const handleProjectNameEdit = (project: Project) => {
+    setEditingProjectId(project.id);
+    setEditingProjectName(project.name);
+  };
+
+  const handleProjectNameSave = async (projectId: number) => {
+    try {
+      const trimmedName = editingProjectName.trim();
+      if (!trimmedName) {
+        alert('Project name cannot be empty');
+        return;
+      }
+
+      const updatedProject = await StorageManager.updateProject(projectId, { name: trimmedName });
+      if (updatedProject) {
+        setProjects(prev => prev.map(p => p.id === projectId ? updatedProject : p));
+        setEditingProjectId(null);
+        setEditingProjectName('');
+      } else {
+        alert('Failed to update project name');
+      }
+    } catch (error) {
+      console.error('Error updating project name:', error);
+      alert('Failed to update project name');
+    }
+  };
+
+  const handleProjectNameCancel = () => {
+    setEditingProjectId(null);
+    setEditingProjectName('');
+  };
+
+  const handleItemTitleEdit = (item: TodoItem) => {
+    setEditingItemId(item.id);
+    setEditingItemTitle(item.title);
+  };
+
+  const handleItemTitleSave = async (itemId: number) => {
+    try {
+      const trimmedTitle = editingItemTitle.trim();
+      if (!trimmedTitle) {
+        alert('Title cannot be empty');
+        return;
+      }
+
+      const updatedItem = await StorageManager.updateItem(itemId, { title: trimmedTitle });
+      if (updatedItem) {
+        setItems(prev => prev.map(item => item.id === itemId ? updatedItem : item));
+        setEditingItemId(null);
+        setEditingItemTitle('');
+      } else {
+        alert('Failed to update task title');
+      }
+    } catch (error) {
+      console.error('Error updating task title:', error);
+      alert('Failed to update task title');
+    }
+  };
+
+  const handleItemTitleCancel = () => {
+    setEditingItemId(null);
+    setEditingItemTitle('');
   };
 
   const confirmDeleteProject = async () => {
@@ -317,72 +387,6 @@ export default function DashboardPage() {
     setProjectToDelete(null);
   };
 
-  const handleDragStart = (e: React.DragEvent, itemId: number) => {
-    setDraggedItem(itemId);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  const handleDragOver = (e: React.DragEvent, itemId: number) => {
-    e.preventDefault();
-    if (draggedItem && draggedItem !== itemId) {
-      setDragOverItem(itemId);
-    }
-  };
-
-  const handleDragLeave = () => {
-    setDragOverItem(null);
-  };
-
-  const handleDrop = async (e: React.DragEvent, targetItemId: number) => {
-    e.preventDefault();
-    if (!draggedItem || draggedItem === targetItemId) return;
-
-    const draggedItemData = items.find(item => item.id === draggedItem);
-    const targetItemData = items.find(item => item.id === targetItemId);
-
-    if (!draggedItemData || !targetItemData) return;
-
-    // 确保两个项目在同一个项目中
-    if (draggedItemData.projectId !== targetItemData.projectId) return;
-
-    const projectId = draggedItemData.projectId;
-    const currentOrder = projectItemOrder[projectId] || [];
-
-    // 找到拖拽项目和目标项目在排序中的索引
-    const draggedIndex = currentOrder.indexOf(draggedItem);
-    const targetIndex = currentOrder.indexOf(targetItemId);
-
-    if (draggedIndex === -1 || targetIndex === -1) return;
-
-    // 创建新的排序数组
-    const newOrder = [...currentOrder];
-
-    // 移除拖拽的项目
-    newOrder.splice(draggedIndex, 1);
-
-    // 在目标位置插入拖拽的项目
-    newOrder.splice(targetIndex, 0, draggedItem);
-
-    // 更新排序状态
-    setProjectItemOrder(prev => ({
-      ...prev,
-      [projectId]: newOrder
-    }));
-
-    // 更新项目的更新时间
-    try {
-      const updatedItem = await StorageManager.updateItem(draggedItem, { updatedAt: new Date() });
-      if (updatedItem) {
-        // GraphQL 现在只更新提供的字段，返回完整对象，所以直接使用返回的数据
-        setItems(prev => prev.map(item => item.id === draggedItem ? updatedItem : item));
-      }
-    } catch (error) {
-      console.error('Error updating item order:', error);
-    }
-
-    setDraggedItem(null);
-    setDragOverItem(null);
-  };
 
   const getStatusStyle = (status: string) => {
     switch (status) {
@@ -432,12 +436,12 @@ export default function DashboardPage() {
     }
   };
 
-  const updateProjectFilter = (projectId: number, filterType: 'all' | 'Feature' | 'Issue', sortBy: 'status' | 'type' | 'updatedAt' | 'createdAt' | 'module') => {
-    console.log('Updating project filter:', { projectId, filterType, sortBy });
+  const updateProjectFilter = (projectId: number, sortBy: 'status' | 'updatedAt' | 'createdAt' | 'module') => {
+    console.log('Updating project filter:', { projectId, sortBy });
     setProjectFilters(prev => {
       const newFilters = {
         ...prev,
-        [projectId]: { filterType, sortBy }
+        [projectId]: { sortBy }
       };
       console.log('New project filters:', newFilters);
       return newFilters;
@@ -449,35 +453,48 @@ export default function DashboardPage() {
     }, 0);
   };
 
-  const stats = StatisticsCalculator.calculateStatistics(items, projects);
+  // Filter projects and items based on selected project filter
+  const filteredProjects = selectedProjectFilter
+    ? projects.filter(p => p.id === selectedProjectFilter)
+    : projects;
+
+  const filteredItems = selectedProjectFilter
+    ? items.filter(item => item.projectId === selectedProjectFilter)
+    : items;
+
+  const stats = StatisticsCalculator.calculateStatistics(filteredItems, filteredProjects);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div className="bg-gray-50 min-h-full">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-            <p className="mt-2 text-gray-600">Overview of all projects and tasks</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
+            <p className="mt-1.5 text-sm sm:text-base text-gray-600">
+              {selectedProjectFilter
+                ? `Overview of ${projects.find(p => p.id === selectedProjectFilter)?.name || 'selected project'}`
+                : 'Overview of all projects and tasks'}
+            </p>
           </div>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={() => setIsQuickAddModalOpen(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              className="flex items-center gap-2 px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium shadow-sm"
             >
               <Plus className="w-4 h-4" />
               <span>Quick Add Task</span>
             </button>
             <button
               onClick={() => setIsProjectModalOpen(true)}
-              className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+              className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium shadow-sm"
             >
               <Plus className="w-4 h-4" />
               <span>Add Project</span>
             </button>
             <button
               onClick={handleExportAll}
-              className="flex items-center space-x-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
+              className="flex items-center gap-2 px-3 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm font-medium shadow-sm"
             >
               <Download className="w-4 h-4" />
               <span>Export All</span>
@@ -486,128 +503,165 @@ export default function DashboardPage() {
         </div>
 
         {/* Statistics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
             <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <BarChart3 className="w-6 h-6 text-blue-600" />
+              <div className="p-2.5 bg-blue-100 rounded-lg">
+                <BarChart3 className="w-5 h-5 text-blue-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Total Items</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.totalItems}</p>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Items</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.totalItems}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
             <div className="flex items-center">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckCircle className="w-6 h-6 text-green-600" />
+              <div className="p-2.5 bg-green-100 rounded-lg">
+                <CheckCircle className="w-5 h-5 text-green-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Completed</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.completedItems}</p>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Completed</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.completedItems}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
             <div className="flex items-center">
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Clock className="w-6 h-6 text-blue-600" />
+              <div className="p-2.5 bg-blue-100 rounded-lg">
+                <Clock className="w-5 h-5 text-blue-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">In Progress</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.inProgressItems}</p>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">In Progress</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.inProgressItems}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow">
             <div className="flex items-center">
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <AlertCircle className="w-6 h-6 text-yellow-600" />
+              <div className="p-2.5 bg-yellow-100 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-yellow-600" />
               </div>
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Not Started</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.notStartedItems}</p>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Not Started</p>
+                <p className="text-2xl font-bold text-gray-900 mt-1">{stats.notStartedItems}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Projects List */}
-        <div className="space-y-8">
-          {projects.map(project => {
-            const projectItems = getProjectItems(project.id);
+        <div className="space-y-5">
+          {filteredProjects.map(project => {
+            const showCompleted = showCompletedItems[project.id] ?? false; // Default to hiding completed items
+            const projectItemsData = getProjectItems(project.id, showCompleted);
+            const projectItems = showCompleted ? projectItemsData.all : projectItemsData.unfinished;
             const isExpanded = expandedProjects.has(project.id);
-            const completedCount = projectItems.filter(item => item.status === 'Completed').length;
-            const progressCount = projectItems.filter(item => item.status === 'On progress').length;
+            const completedCount = projectItemsData.completed.length;
+            const progressCount = projectItemsData.unfinished.filter(item => item.status === 'On progress').length;
+            const unfinishedCount = projectItemsData.unfinished.length;
 
             return (
-              <div key={project.id} className="bg-white rounded-lg shadow">
-                <div className="p-6 border-b border-gray-200">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-4">
+              <div key={project.id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-shadow">
+                <div className="p-4 border-b border-gray-100">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start space-x-2 flex-1 min-w-0">
                       <button
                         onClick={() => toggleProject(project.id)}
-                        className="text-gray-400 hover:text-gray-600"
+                        className="mt-0.5 text-gray-400 hover:text-gray-600 transition-colors flex-shrink-0"
                       >
                         {isExpanded ? (
-                          <ChevronDown className="w-5 h-5" />
+                          <ChevronDown className="w-4 h-4" />
                         ) : (
-                          <ChevronRight className="w-5 h-5" />
+                          <ChevronRight className="w-4 h-4" />
                         )}
                       </button>
-                      <div className="flex-1">
-                        <h3 className="text-lg font-medium text-gray-900">{project.name}</h3>
-                        <p className="text-sm text-gray-500">{project.description}</p>
+                      <div className="flex-1 min-w-0">
+                        {editingProjectId === project.id ? (
+                          <div className="flex items-center space-x-2">
+                            <input
+                              type="text"
+                              value={editingProjectName}
+                              onChange={(e) => setEditingProjectName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleProjectNameSave(project.id);
+                                } else if (e.key === 'Escape') {
+                                  handleProjectNameCancel();
+                                }
+                              }}
+                              onBlur={() => handleProjectNameSave(project.id)}
+                              className="text-base font-semibold text-gray-900 px-2 py-1 border border-blue-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                              autoFocus
+                            />
+                          </div>
+                        ) : (
+                          <h3
+                            className="text-base font-semibold text-gray-900 cursor-pointer hover:text-blue-600 transition-colors"
+                            onClick={() => handleProjectNameEdit(project)}
+                            title="Click to edit project name"
+                          >
+                            {project.name}
+                          </h3>
+                        )}
+                        {project.description && (
+                          <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">{project.description}</p>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-2 text-sm text-gray-500">
-                        <span className="flex items-center space-x-1">
-                          <CheckCircle className="w-4 h-4 text-green-500" />
-                          <span>{completedCount}</span>
-                        </span>
-                        <span className="flex items-center space-x-1">
-                          <Clock className="w-4 h-4 text-blue-500" />
-                          <span>{progressCount}</span>
-                        </span>
-                        <span>{projectItems.length} total</span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-2 px-2 py-1 bg-gray-50 rounded-md">
+                        {unfinishedCount > 0 && (
+                          <>
+                            <div className="flex items-center gap-1 text-xs">
+                              <Clock className="w-3 h-3 text-blue-600" />
+                              <span className="font-semibold text-gray-700">{unfinishedCount}</span>
+                            </div>
+                            {completedCount > 0 && <div className="w-px h-3 bg-gray-300"></div>}
+                          </>
+                        )}
+                        {completedCount > 0 && (
+                          <div className="flex items-center gap-1 text-xs">
+                            <CheckCircle className="w-3 h-3 text-green-600" />
+                            <span className="font-medium text-gray-600">{completedCount}</span>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center gap-0.5">
                         <button
                           onClick={() => {
                             setSelectedProjectId(project.id);
                             setIsQuickAddModalOpen(true);
                           }}
-                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-md"
-                          title="Add task to this project"
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                          title="Add task"
                         >
-                          <Plus className="w-4 h-4" />
+                          <Plus className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleArchiveProject(project.id)}
-                          disabled={archivingProject === project.id}
-                          className="p-2 text-orange-600 hover:bg-orange-50 rounded-md disabled:opacity-50"
-                          title="Archive completed tasks"
+                          disabled={archivingProject === project.id || unfinishedCount > 0 || completedCount === 0}
+                          className="p-1.5 text-orange-600 hover:bg-orange-50 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          title={unfinishedCount > 0 ? "Complete all tasks to archive project" : completedCount === 0 ? "No items to archive" : "Archive entire project"}
                         >
-                          <Archive className="w-4 h-4" />
+                          <Archive className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleExportProject(project)}
-                          className="p-2 text-gray-600 hover:bg-gray-50 rounded-md"
-                          title="Export project tasks"
+                          className="p-1.5 text-gray-600 hover:bg-gray-50 rounded-md transition-colors"
+                          title="Export"
                         >
-                          <Download className="w-4 h-4" />
+                          <Download className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDeleteProject(project)}
-                          className="p-2 text-red-600 hover:bg-red-50 rounded-md"
-                          title="Delete project"
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                          title="Delete"
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -615,124 +669,257 @@ export default function DashboardPage() {
                 </div>
 
                 {isExpanded && (
-                  <div className="p-6">
-                    {/* Project Filter and Sort Controls */}
-                    <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-4">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Filter</label>
-                            <select
-                              value={projectFilters[project.id]?.filterType || 'all'}
-                              onChange={(e) => {
-                                const currentFilter = projectFilters[project.id] || { filterType: 'all', sortBy: 'status' };
-                                updateProjectFilter(project.id, e.target.value as 'all' | 'Feature' | 'Issue', currentFilter.sortBy);
-                              }}
-                              className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            >
-                              <option value="all">All Types</option>
-                              <option value="Feature">✨ Features</option>
-                              <option value="Issue">🐛 Issues</option>
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">Sort</label>
-                            <select
-                              value={projectFilters[project.id]?.sortBy || 'status'}
-                              onChange={(e) => {
-                                const currentFilter = projectFilters[project.id] || { filterType: 'all', sortBy: 'status' };
-                                updateProjectFilter(project.id, currentFilter.filterType, e.target.value as 'status' | 'type' | 'updatedAt' | 'createdAt' | 'module');
-                              }}
-                              className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            >
-                              <option value="status">Status</option>
-                              <option value="type">Type</option>
-                              <option value="module">Module</option>
-                              <option value="updatedAt">Updated</option>
-                              <option value="createdAt">Created</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {projectItems.length} tasks
-                        </div>
+                  <div className="p-3 pt-2">
+                    {/* Project Sort Controls */}
+                    <div className="mb-3 px-2 py-1.5 bg-gray-50 rounded-md border border-gray-100 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <label className="text-xs font-medium text-gray-600">Sort:</label>
+                        <select
+                          value={projectFilters[project.id]?.sortBy || 'status'}
+                          onChange={(e) => {
+                            updateProjectFilter(project.id, e.target.value as 'status' | 'updatedAt' | 'createdAt' | 'module');
+                          }}
+                          className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                        >
+                          <option value="status">Status</option>
+                          <option value="module">Module</option>
+                          <option value="updatedAt">Updated</option>
+                          <option value="createdAt">Created</option>
+                        </select>
                       </div>
+                      {completedCount > 0 && (
+                        <button
+                          onClick={() => setShowCompletedItems(prev => ({ ...prev, [project.id]: !prev[project.id] }))}
+                          className="text-xs text-gray-600 hover:text-blue-600 font-medium px-2 py-0.5 hover:bg-blue-50 rounded transition-colors"
+                        >
+                          {showCompleted ? `Hide ${completedCount} completed` : `Show ${completedCount} completed`}
+                        </button>
+                      )}
                     </div>
 
-                    {projectItems.length === 0 ? (
-                      <div className="text-center py-8 text-gray-500">
-                        No tasks in this project
+                    {unfinishedCount === 0 && (!showCompleted || projectItemsData.completed.length === 0) ? (
+                      <div className="text-center py-8">
+                        <div className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 mb-2">
+                          <Plus className="w-5 h-5 text-gray-400" />
+                        </div>
+                        <p className="text-xs font-medium text-gray-500 mb-1">No tasks</p>
+                        <button
+                          onClick={() => {
+                            setSelectedProjectId(project.id);
+                            setIsQuickAddModalOpen(true);
+                          }}
+                          className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                        >
+                          Add task
+                        </button>
                       </div>
                     ) : (
-                      <div className="space-y-3">
-                        {projectItems.map((item, index) => (
-                          <div
-                            key={item.id}
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, item.id)}
-                            onDragOver={(e) => handleDragOver(e, item.id)}
-                            onDragLeave={handleDragLeave}
-                            onDrop={(e) => handleDrop(e, item.id)}
-                            className={`flex items-center space-x-3 p-4 rounded-lg border-2 transition-all ${draggedItem === item.id
-                              ? 'opacity-50'
-                              : dragOverItem === item.id
-                                ? 'border-blue-300 bg-blue-50'
-                                : getStatusStyle(item.status)
-                              }`}
-                          >
-                            <div className="flex-shrink-0 cursor-move text-gray-400 hover:text-gray-600">
-                              <GripVertical className="w-4 h-4" />
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center space-x-3">
-                                <div className="flex items-center space-x-2">
-                                  <span className="text-lg">
-                                    {item.type === 'Feature' ? '✨' : '🐛'}
-                                  </span>
-                                  <h4 className="font-medium text-gray-900">{item.title}</h4>
-                                </div>
-                              </div>
-                              <div className="flex items-center space-x-3">
-                                <div className="relative status-dropdown">
-                                  <button
-                                    onClick={() => handleStatusClick(item.id)}
-                                    className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-full cursor-pointer transition-colors"
-                                    style={{
-                                      backgroundColor: getStatusColor(item.status).bg,
-                                      color: getStatusColor(item.status).text
-                                    }}
-                                  >
-                                    {item.status}
-                                    <ChevronDown className="w-3 h-3 ml-1" />
-                                  </button>
-
-                                  {statusDropdownOpen === item.id && (
-                                    <div className="absolute top-full left-0 mt-1 w-48 bg-white border border-gray-200 rounded-md shadow-lg z-10">
-                                      <div className="py-1">
-                                        {(['Not start', 'On progress', 'Pending', 'Completed'] as ItemStatus[]).map((status) => (
-                                          <button
-                                            key={status}
-                                            onClick={() => handleStatusChange(item.id, status)}
-                                            className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                                          >
-                                            {status}
-                                          </button>
-                                        ))}
-                                      </div>
+                      <div className="space-y-1.5">
+                        {/* Unfinished Items */}
+                        {projectItemsData.unfinished.map((item, index) => {
+                          const orderKey = `${item.id}-${index}`;
+                          return (
+                            <div
+                              key={orderKey}
+                              className={`task-item group relative p-3 rounded-md border transition-all duration-300 ease-in-out hover:shadow-sm ${getStatusStyle(item.status)} hover:border-gray-300`}
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  {editingItemId === item.id ? (
+                                    <div className="flex items-center gap-1.5">
+                                      <input
+                                        type="text"
+                                        value={editingItemTitle}
+                                        onChange={(e) => setEditingItemTitle(e.target.value)}
+                                        onKeyDown={(e) => {
+                                          if (e.key === 'Enter') {
+                                            handleItemTitleSave(item.id);
+                                          } else if (e.key === 'Escape') {
+                                            handleItemTitleCancel();
+                                          }
+                                        }}
+                                        onBlur={() => handleItemTitleSave(item.id)}
+                                        className="flex-1 text-sm font-medium text-gray-900 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                        autoFocus
+                                      />
+                                      <button
+                                        onClick={() => handleItemTitleSave(item.id)}
+                                        className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                        title="Save"
+                                      >
+                                        <Check className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={handleItemTitleCancel}
+                                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                        title="Cancel"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-start gap-2">
+                                      <h4 className="text-sm font-medium text-gray-900 flex-1 leading-tight">{item.title}</h4>
+                                      <button
+                                        onClick={() => handleItemTitleEdit(item)}
+                                        className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                        title="Edit"
+                                      >
+                                        <Edit2 className="w-3.5 h-3.5" />
+                                      </button>
                                     </div>
                                   )}
+                                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                    <div className="relative status-dropdown">
+                                      <button
+                                        onClick={() => handleStatusClick(item.id)}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full cursor-pointer transition-all"
+                                        style={{
+                                          backgroundColor: getStatusColor(item.status).bg,
+                                          color: getStatusColor(item.status).text
+                                        }}
+                                      >
+                                        {item.status}
+                                        <ChevronDown className="w-2.5 h-2.5" />
+                                      </button>
+                                      {statusDropdownOpen === item.id && (
+                                        <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                                          <div className="py-1">
+                                            {(['Not start', 'On progress', 'Pending', 'Completed'] as ItemStatus[]).map((status) => (
+                                              <button
+                                                key={status}
+                                                onClick={() => handleStatusChange(item.id, status)}
+                                                className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 transition-colors"
+                                              >
+                                                {status}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                    <span className="text-xs text-gray-500 flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      {formatRelativeTime(item.updatedAt)}
+                                    </span>
+                                    <EditableModule
+                                      module={(item as any).module || 'Other'}
+                                      onSave={(newModule) => handleModuleUpdate(item.id, newModule)}
+                                    />
+                                  </div>
                                 </div>
-                                <span className="text-xs text-gray-500">
-                                  Updated {formatRelativeTime(item.updatedAt)}
-                                </span>
-                                <EditableModule
-                                  module={(item as any).module || 'Other'}
-                                  onSave={(newModule) => handleModuleUpdate(item.id, newModule)}
-                                />
                               </div>
                             </div>
+                          );
+                        })}
+
+                        {/* Completed Items */}
+                        {showCompleted && projectItemsData.completed.length > 0 && (
+                          <div className="mt-2 pt-2 border-t border-gray-100">
+                            <div className="mb-1.5 px-2">
+                              <span className="text-xs font-medium text-gray-500">Completed ({projectItemsData.completed.length})</span>
+                            </div>
+                            <div className="space-y-1">
+                              {projectItemsData.completed.map((item, index) => {
+                                const orderKey = `completed-${item.id}-${index}`;
+                                return (
+                                  <div
+                                    key={orderKey}
+                                    className="task-item group relative p-2.5 rounded-md border border-gray-200 bg-gray-50 opacity-75 hover:opacity-100 transition-all duration-300 ease-in-out"
+                                  >
+                                    <div className="flex items-start justify-between gap-2">
+                                      <div className="flex-1 min-w-0">
+                                        {editingItemId === item.id ? (
+                                          <div className="flex items-center gap-1.5">
+                                            <input
+                                              type="text"
+                                              value={editingItemTitle}
+                                              onChange={(e) => setEditingItemTitle(e.target.value)}
+                                              onKeyDown={(e) => {
+                                                if (e.key === 'Enter') {
+                                                  handleItemTitleSave(item.id);
+                                                } else if (e.key === 'Escape') {
+                                                  handleItemTitleCancel();
+                                                }
+                                              }}
+                                              onBlur={() => handleItemTitleSave(item.id)}
+                                              className="flex-1 text-sm font-medium text-gray-900 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                              autoFocus
+                                            />
+                                            <button
+                                              onClick={() => handleItemTitleSave(item.id)}
+                                              className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                              title="Save"
+                                            >
+                                              <Check className="w-3.5 h-3.5" />
+                                            </button>
+                                            <button
+                                              onClick={handleItemTitleCancel}
+                                              className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                              title="Cancel"
+                                            >
+                                              <X className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                        ) : (
+                                          <div className="flex items-start gap-2">
+                                            <h4 className="text-sm font-medium text-gray-600 flex-1 leading-tight line-through">{item.title}</h4>
+                                            <button
+                                              onClick={() => handleItemTitleEdit(item)}
+                                              className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                              title="Edit"
+                                            >
+                                              <Edit2 className="w-3.5 h-3.5" />
+                                            </button>
+                                          </div>
+                                        )}
+                                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                          <div className="relative status-dropdown">
+                                            <button
+                                              onClick={() => handleStatusClick(item.id)}
+                                              className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-medium rounded-full cursor-pointer transition-all"
+                                              style={{
+                                                backgroundColor: getStatusColor(item.status).bg,
+                                                color: getStatusColor(item.status).text
+                                              }}
+                                            >
+                                              {item.status}
+                                              <ChevronDown className="w-2.5 h-2.5" />
+                                            </button>
+
+                                            {statusDropdownOpen === item.id && (
+                                              <div className="absolute top-full left-0 mt-1 w-40 bg-white border border-gray-200 rounded-md shadow-lg z-10">
+                                                <div className="py-1">
+                                                  {(['Not start', 'On progress', 'Pending', 'Completed'] as ItemStatus[]).map((status) => (
+                                                    <button
+                                                      key={status}
+                                                      onClick={() => handleStatusChange(item.id, status)}
+                                                      className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 transition-colors"
+                                                    >
+                                                      {status}
+                                                    </button>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            )}
+                                          </div>
+                                          <span className="text-xs text-gray-400 flex items-center gap-1">
+                                            <Clock className="w-3 h-3" />
+                                            {formatRelativeTime(item.updatedAt)}
+                                          </span>
+                                          <EditableModule
+                                            module={(item as any).module || 'Other'}
+                                            onSave={(newModule) => handleModuleUpdate(item.id, newModule)}
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
-                        ))}
+                        )}
                       </div>
                     )}
                   </div>
@@ -742,7 +929,7 @@ export default function DashboardPage() {
           })}
         </div>
 
-        {projects.length === 0 && (
+        {filteredProjects.length === 0 && (
           <div className="text-center py-12">
             <div className="mx-auto w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
               <BarChart3 className="w-6 h-6 text-gray-400" />
@@ -794,7 +981,7 @@ export default function DashboardPage() {
                     Are you sure you want to delete the project <strong>"{projectToDelete.name}"</strong>?
                   </p>
                   <p className="text-sm text-red-600">
-                    This will also delete all {getProjectItems(projectToDelete.id).length} tasks in this project.
+                    This will also delete all {getProjectItems(projectToDelete.id, true).all.length} tasks in this project.
                   </p>
                 </div>
 
