@@ -124,7 +124,7 @@ Return only the JSON array, no additional text.`;
       } else {
         throw new Error('No valid JSON array found in response');
       }
-    } catch (parseError) {
+    } catch {
       return NextResponse.json({
         error: 'Failed to parse tasks from API response',
         content: content.substring(0, 500) // 返回前500个字符用于调试
@@ -137,8 +137,9 @@ Return only the JSON array, no additional text.`;
     }
 
     // 生成总结
-    const featureCount = tasks.filter((t: any) => t.type === 'Feature').length;
-    const issueCount = tasks.filter((t: any) => t.type === 'Issue').length;
+    interface TaskType { type: string }
+    const featureCount = tasks.filter((t: TaskType) => t.type === 'Feature').length;
+    const issueCount = tasks.filter((t: TaskType) => t.type === 'Issue').length;
     const summary = `${tasks.length} tasks identified (${featureCount} features, ${issueCount} issues)`;
 
     // 计算置信度
@@ -146,7 +147,8 @@ Return only the JSON array, no additional text.`;
     if (tasks.length >= 3 && tasks.length <= 8) {
       confidence += 0.2;
     }
-    const validTasks = tasks.filter((t: any) =>
+    interface TaskValidation { title?: string; description?: string }
+    const validTasks = tasks.filter((t: TaskValidation) =>
       t.title && t.title.length > 5 &&
       t.description && t.description.length > 10
     );

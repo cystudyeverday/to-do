@@ -16,7 +16,7 @@ export async function GET() {
       hasApiKey: true,
       message: 'Cursor API key found in environment variables'
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({
       hasApiKey: false,
       message: 'Error checking Cursor API configuration'

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { apolloClient } from '@/lib/apollo-client';
 import { GET_STATISTICS, GET_ITEMS, GET_PROJECTS } from '@/lib/graphql/queries';
 

@@ -10,7 +10,7 @@ import { CursorAPIExtractor } from '@/lib/cursor-api-extractor';
 import { ProjectModal } from '@/components/project-modal';
 import { BatchManager } from '@/components/batch-manager';
 import { APIKeyModal } from '@/components/api-key-modal';
-import { Plus, Sparkles, Check, X, Edit3, ArrowLeft, Zap, Cpu, Key, Settings } from 'lucide-react';
+import { Plus, Sparkles, Check, X, ArrowLeft, Zap, Cpu, Key, Settings } from 'lucide-react';
 
 export default function AddPage() {
   const router = useRouter();
@@ -39,11 +39,14 @@ export default function AddPage() {
   const [showAgentMode, setShowAgentMode] = useState(false);
 
   useEffect(() => {
-    const projectsData = StorageManager.getProjects();
-    setProjects(projectsData);
-    if (projectsData.length > 0) {
-      setSelectedProject(projectsData[0].id);
-    }
+    const loadProjects = async () => {
+      const projectsData = await StorageManager.getProjects();
+      setProjects(projectsData);
+      if (projectsData.length > 0) {
+        setSelectedProject(projectsData[0].id.toString());
+      }
+    };
+    loadProjects();
 
     // 检查API可用性
     checkAPIHealth();
@@ -53,7 +56,7 @@ export default function AddPage() {
     try {
       const isHealthy = await APIExtractor.checkAPIHealth();
       setApiAvailable(isHealthy);
-    } catch (error) {
+    } catch {
       console.log('Local API not available');
       setApiAvailable(false);
     }
@@ -85,11 +88,11 @@ export default function AddPage() {
           } else {
             setCursorApiAvailable(false);
           }
-        } catch (error) {
+        } catch {
           setCursorApiAvailable(false);
         }
       }
-    } catch (error) {
+    } catch {
       console.log('Cursor API not available');
       setCursorApiAvailable(false);
     }
@@ -161,11 +164,11 @@ Return only the JSON array, no additional text.`;
       }
 
       // 转换为SplitResult格式
-      const results: SplitResult[] = validTasks.map((task: any) => ({
+      const results: SplitResult[] = validTasks.map((task: { title: string; description: string; type: ItemType; status: ItemStatus; module?: string }) => ({
         title: task.title,
         description: task.description,
         type: task.type as ItemType,
-        status: task.status as ItemStatus,
+        status: (task.status === 'Pending' ? 'Not start' : task.status) as SplitResult['status'],
         module: task.module || 'Other',
         summary: task.description.substring(0, 100) + (task.description.length > 100 ? '...' : ''),
       }));
@@ -181,7 +184,7 @@ Return only the JSON array, no additional text.`;
       setExtractionStats({ model: 'Cursor Agent', processing_time: 0 });
       setShowAgentMode(false);
       setShowPreview(true);
-    } catch (error) {
+    } catch {
       alert('Failed to parse the output. Please check the JSON format.');
     }
   };
@@ -193,7 +196,7 @@ Return only the JSON array, no additional text.`;
     }
 
     setIsSplitting(true);
-    const project = projects.find(p => p.id === selectedProject);
+    const project = projects.find(p => p.id.toString() === selectedProject);
     if (!project) return;
 
     try {
@@ -218,7 +221,7 @@ Return only the JSON array, no additional text.`;
           text: description,
           projectName: project.name,
           language: 'en',
-          model: selectedModel as any,
+          model: selectedModel as 'gpt-4' | 'gpt-3.5-turbo' | 'claude-3' | 'claude-3.5-sonnet',
           maxTasks,
           context: 'Web application development with React/Next.js'
         });
@@ -262,34 +265,34 @@ Return only the JSON array, no additional text.`;
 
   const handleProjectAdded = (newProject: Project) => {
     setProjects(prev => [...prev, newProject]);
-    setSelectedProject(newProject.id);
+    setSelectedProject(newProject.id.toString());
   };
 
-  const handleSaveAll = () => {
+  const handleSaveAll = async () => {
     if (splitResults.length === 0) {
       alert('Please generate tasks first');
       return;
     }
 
     try {
-      const project = projects.find(p => p.id === selectedProject);
+      const project = projects.find(p => p.id.toString() === selectedProject);
       if (!project) {
         alert('Project not found');
         return;
       }
 
       const savedItems: TodoItem[] = [];
-      splitResults.forEach(result => {
-        const newItem = StorageManager.addItem({
+      for (const result of splitResults) {
+        const newItem = await StorageManager.addItem({
           title: result.title,
           description: result.description,
           type: result.type,
           status: result.status as ItemStatus,
-          projectId: selectedProject,
+          projectId: parseInt(selectedProject, 10),
           module: result.module || 'Other'
         });
         savedItems.push(newItem);
-      });
+      }
 
       alert(`Successfully added ${savedItems.length} tasks to project "${project.name}"`);
       router.push('/dashboard');
@@ -309,9 +312,6 @@ Return only the JSON array, no additional text.`;
     setSplitResults(splitResults.filter((_, i) => i !== index));
   };
 
-  const handleBatchUpdate = (updatedResults: SplitResult[]) => {
-    setSplitResults(updatedResults);
-  };
 
   const handleBackToInput = () => {
     setShowPreview(false);
@@ -330,7 +330,7 @@ Return only the JSON array, no additional text.`;
     handleSmartSplit();
   };
 
-  const handleApiKeySave = (apiKey: string) => {
+  const handleApiKeySave = () => {
     setCursorApiAvailable(true);
     checkAPIHealth();
   };
@@ -589,13 +589,13 @@ Return only the JSON array, no additional text.`;
             {/* Batch Manager */}
             <BatchManager
               items={splitResults.map((result, index) => ({
-                id: `temp-${index}`,
+                id: -(index + 1), // Use negative numbers for temp items
                 title: result.title,
                 description: result.description,
                 type: result.type,
                 status: 'Not start' as ItemStatus,
-                projectId: selectedProject,
-                module: result.module,
+                projectId: parseInt(selectedProject, 10),
+                module: result.module || 'Other',
                 createdAt: new Date(),
                 updatedAt: new Date()
               }))}
@@ -604,9 +604,9 @@ Return only the JSON array, no additional text.`;
                   title: item.title,
                   description: item.description,
                   type: item.type,
-                  module: item.module,
+                  module: item.module || 'Other',
                   summary: splitResults[idx]?.summary || '',
-                  status: item.status as ItemStatus
+                  status: (item.status === 'Pending' ? 'Not start' : item.status) as SplitResult['status']
                 }));
                 setSplitResults(newResults);
               }}

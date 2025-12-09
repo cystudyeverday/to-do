@@ -7,7 +7,6 @@ import { StorageManager } from '@/lib/storage';
 import { StatisticsCalculator } from '@/lib/statistics';
 import { ProjectModal } from '@/components/project-modal';
 import { QuickAddModal } from '@/components/quick-add-modal';
-import { EditableModule } from '@/components/editable-module';
 import { formatRelativeTime } from '@/lib/utils';
 import { ExcelExporter } from '@/lib/excel-export';
 import {
@@ -36,7 +35,6 @@ export default function DashboardPage() {
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [statusDropdownOpen, setStatusDropdownOpen] = useState<number | null>(null);
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null);
-  const [projectItemOrder, setProjectItemOrder] = useState<Record<number, number[]>>({});
   const [projectFilters, setProjectFilters] = useState<Record<number, { sortBy: 'status' | 'updatedAt' | 'createdAt' | 'module' }>>({});
   const [archivingProject, setArchivingProject] = useState<number | null>(null);
   const [editingProjectId, setEditingProjectId] = useState<number | null>(null);
@@ -44,7 +42,6 @@ export default function DashboardPage() {
   const [editingItemId, setEditingItemId] = useState<number | null>(null);
   const [editingItemTitle, setEditingItemTitle] = useState<string>('');
   const [showCompletedItems, setShowCompletedItems] = useState<Record<number, boolean>>({});
-  const [itemOrderKeys, setItemOrderKeys] = useState<Record<number, number>>({});
 
   // Get selected project from URL params
   const selectedProjectFilter = searchParams.get('project') ? parseInt(searchParams.get('project')!, 10) : null;
@@ -72,14 +69,15 @@ export default function DashboardPage() {
       const itemsData = await StorageManager.getItems();
 
       // 为现有任务添加默认module字段（如果没有的话）
+      interface ItemWithModule extends TodoItem { module?: string }
       const updatedItems = itemsData.map(item => ({
         ...item,
-        module: (item as any).module || 'Other'
+        module: (item as ItemWithModule).module || 'Other'
       }));
 
       // 如果有任务被更新，保存到存储
       if (updatedItems.length !== itemsData.length ||
-        updatedItems.some((item, i) => item.module !== (itemsData[i] as any).module)) {
+        updatedItems.some((item, i) => item.module !== ((itemsData[i] as ItemWithModule).module || 'Other'))) {
         for (const item of updatedItems) {
           await StorageManager.updateItem(item.id, { module: item.module });
         }
@@ -87,14 +85,6 @@ export default function DashboardPage() {
 
       setProjects(projectsData);
       setItems(updatedItems);
-
-      // 初始化项目排序状态
-      const orderState: Record<number, number[]> = {};
-      projectsData.forEach(project => {
-        const projectItems = updatedItems.filter(item => item.projectId === project.id);
-        orderState[project.id] = projectItems.map(item => item.id);
-      });
-      setProjectItemOrder(orderState);
 
       // 默认展开所有项目
       const allProjectIds = new Set(projectsData.map(project => project.id));
@@ -135,7 +125,7 @@ export default function DashboardPage() {
     console.log('Sorting by:', projectFilter.sortBy, 'items before sort:', projectItems.map(item => ({
       title: item.title,
       status: item.status,
-      module: (item as any).module || 'Other',
+      module: ((item as ItemWithModule).module) || 'Other',
       updatedAt: item.updatedAt,
       createdAt: item.createdAt
     })));
@@ -156,8 +146,9 @@ export default function DashboardPage() {
 
         case 'module':
           // Module：按 module 排序，相同 module 内按状态排序
-          const moduleA = (a as any).module || 'Other';
-          const moduleB = (b as any).module || 'Other';
+          interface ItemWithModule extends TodoItem { module?: string }
+          const moduleA = (a as ItemWithModule).module || 'Other';
+          const moduleB = (b as ItemWithModule).module || 'Other';
           if (moduleA !== moduleB) {
             return moduleA.localeCompare(moduleB);
           }
@@ -189,37 +180,6 @@ export default function DashboardPage() {
     return { unfinished: unfinishedItems, completed: completedItems, all: sortedItems };
   };
 
-  const getProjectsByModule = () => {
-    const moduleGroups: Record<string, Project[]> = {};
-
-    projects.forEach(project => {
-      const projectItems = items.filter(item => item.projectId === project.id);
-
-      // 按任务的module分组
-      projectItems.forEach(item => {
-        const moduleName = (item as any).module || 'Other';
-        if (!moduleGroups[moduleName]) {
-          moduleGroups[moduleName] = [];
-        }
-        // 如果项目还没有在这个模块中，添加它
-        if (!moduleGroups[moduleName].find(p => p.id === project.id)) {
-          moduleGroups[moduleName].push(project);
-        }
-      });
-
-      // 如果项目没有任何任务，归类到 "Other" 模块
-      if (projectItems.length === 0) {
-        if (!moduleGroups['Other']) {
-          moduleGroups['Other'] = [];
-        }
-        if (!moduleGroups['Other'].find(p => p.id === project.id)) {
-          moduleGroups['Other'].push(project);
-        }
-      }
-    });
-
-    return moduleGroups;
-  };
 
   const handleExportAll = () => {
     ExcelExporter.exportToExcel({ projects, items }, 'all-todo-data');
@@ -236,9 +196,6 @@ export default function DashboardPage() {
     setExpandedProjects(prev => new Set([...prev, newProject.id]));
   };
 
-  const handleItemUpdate = (updatedItem: TodoItem) => {
-    setItems(prev => prev.map(item => item.id === updatedItem.id ? updatedItem : item));
-  };
 
   const handleTaskAdded = (newTask: TodoItem) => {
     // 确保项目已展开，以便新任务可见
@@ -250,25 +207,8 @@ export default function DashboardPage() {
 
     // 添加新任务到状态
     setItems(prev => [...prev, newTask]);
-
-    // 更新排序状态，将新任务添加到项目排序的末尾
-    setProjectItemOrder(prev => ({
-      ...prev,
-      [newTask.projectId]: [...(prev[newTask.projectId] || []), newTask.id]
-    }));
   };
 
-  const handleModuleUpdate = async (itemId: number, newModule: string) => {
-    try {
-      const updatedItem = await StorageManager.updateItem(itemId, { module: newModule });
-      if (updatedItem) {
-        // GraphQL 现在只更新提供的字段，返回完整对象，所以直接使用返回的数据
-        setItems(prev => prev.map(item => item.id === itemId ? updatedItem : item));
-      }
-    } catch (error) {
-      console.error('Error updating module:', error);
-    }
-  };
 
   const handleArchiveProject = async (projectId: number) => {
     try {
@@ -558,10 +498,8 @@ export default function DashboardPage() {
           {filteredProjects.map(project => {
             const showCompleted = showCompletedItems[project.id] ?? false; // Default to hiding completed items
             const projectItemsData = getProjectItems(project.id, showCompleted);
-            const projectItems = showCompleted ? projectItemsData.all : projectItemsData.unfinished;
             const isExpanded = expandedProjects.has(project.id);
             const completedCount = projectItemsData.completed.length;
-            const progressCount = projectItemsData.unfinished.filter(item => item.status === 'On progress').length;
             const unfinishedCount = projectItemsData.unfinished.length;
 
             return (
@@ -726,51 +664,62 @@ export default function DashboardPage() {
                               className={`task-item group relative p-3 rounded-md border transition-all duration-300 ease-in-out hover:shadow-sm ${getStatusStyle(item.status)} hover:border-gray-300`}
                             >
                               <div className="flex items-start justify-between gap-2">
-                                <div className="flex-1 min-w-0">
-                                  {editingItemId === item.id ? (
-                                    <div className="flex items-center gap-1.5">
-                                      <input
-                                        type="text"
-                                        value={editingItemTitle}
-                                        onChange={(e) => setEditingItemTitle(e.target.value)}
-                                        onKeyDown={(e) => {
-                                          if (e.key === 'Enter') {
-                                            handleItemTitleSave(item.id);
-                                          } else if (e.key === 'Escape') {
-                                            handleItemTitleCancel();
-                                          }
-                                        }}
-                                        onBlur={() => handleItemTitleSave(item.id)}
-                                        className="flex-1 text-sm font-medium text-gray-900 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
-                                        autoFocus
-                                      />
-                                      <button
-                                        onClick={() => handleItemTitleSave(item.id)}
-                                        className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
-                                        title="Save"
-                                      >
-                                        <Check className="w-3.5 h-3.5" />
-                                      </button>
-                                      <button
-                                        onClick={handleItemTitleCancel}
-                                        className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
-                                        title="Cancel"
-                                      >
-                                        <X className="w-3.5 h-3.5" />
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <div className="flex items-start gap-2">
-                                      <h4 className="text-sm font-medium text-gray-900 flex-1 leading-tight">{item.title}</h4>
-                                      <button
-                                        onClick={() => handleItemTitleEdit(item)}
-                                        className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
-                                        title="Edit"
-                                      >
-                                        <Edit2 className="w-3.5 h-3.5" />
-                                      </button>
-                                    </div>
-                                  )}
+                                <div className="flex items-start gap-2 flex-1 min-w-0">
+                                  <input
+                                    type="checkbox"
+                                    checked={item.status === 'Completed'}
+                                    onChange={() => {
+                                      const newStatus = item.status === 'Completed' ? 'Not start' as ItemStatus : 'Completed' as ItemStatus;
+                                      handleStatusChange(item.id, newStatus);
+                                    }}
+                                    className="mt-0.5 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 cursor-pointer flex-shrink-0"
+                                    title={item.status === 'Completed' ? 'Mark as not completed' : 'Mark as completed'}
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    {editingItemId === item.id ? (
+                                      <div className="flex items-center gap-1.5">
+                                        <input
+                                          type="text"
+                                          value={editingItemTitle}
+                                          onChange={(e) => setEditingItemTitle(e.target.value)}
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') {
+                                              handleItemTitleSave(item.id);
+                                            } else if (e.key === 'Escape') {
+                                              handleItemTitleCancel();
+                                            }
+                                          }}
+                                          onBlur={() => handleItemTitleSave(item.id)}
+                                          className="flex-1 text-sm font-medium text-gray-900 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                                          autoFocus
+                                        />
+                                        <button
+                                          onClick={() => handleItemTitleSave(item.id)}
+                                          className="p-1 text-green-600 hover:bg-green-50 rounded transition-colors"
+                                          title="Save"
+                                        >
+                                          <Check className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button
+                                          onClick={handleItemTitleCancel}
+                                          className="p-1 text-red-600 hover:bg-red-50 rounded transition-colors"
+                                          title="Cancel"
+                                        >
+                                          <X className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-start gap-2">
+                                        <h4 className={`text-sm font-medium text-gray-900 flex-1 leading-tight ${item.status === 'Completed' ? 'line-through text-gray-500' : ''}`}>{item.title}</h4>
+                                        <button
+                                          onClick={() => handleItemTitleEdit(item)}
+                                          className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors opacity-0 group-hover:opacity-100 flex-shrink-0"
+                                          title="Edit"
+                                        >
+                                          <Edit2 className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    )}
                                   <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                                     <div className="relative status-dropdown">
                                       <button
@@ -804,10 +753,7 @@ export default function DashboardPage() {
                                       <Clock className="w-3 h-3" />
                                       {formatRelativeTime(item.updatedAt)}
                                     </span>
-                                    <EditableModule
-                                      module={(item as any).module || 'Other'}
-                                      onSave={(newModule) => handleModuleUpdate(item.id, newModule)}
-                                    />
+                                  </div>
                                   </div>
                                 </div>
                               </div>
@@ -909,10 +855,6 @@ export default function DashboardPage() {
                                             <Clock className="w-3 h-3" />
                                             {formatRelativeTime(item.updatedAt)}
                                           </span>
-                                          <EditableModule
-                                            module={(item as any).module || 'Other'}
-                                            onSave={(newModule) => handleModuleUpdate(item.id, newModule)}
-                                          />
                                         </div>
                                       </div>
                                     </div>

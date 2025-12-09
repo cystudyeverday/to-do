@@ -4,7 +4,7 @@ import { SmartSplitter } from '@/lib/smart-split';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { text, projectName, language = 'en' } = body;
+    const { text, projectName } = body;
 
     if (!text || !projectName) {
       return NextResponse.json(

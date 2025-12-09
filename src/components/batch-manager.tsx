@@ -20,7 +20,7 @@ interface BatchManagerProps {
 }
 
 export function BatchManager({ items, onItemsUpdate }: BatchManagerProps) {
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+  const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
   const [isBatchEditing, setIsBatchEditing] = useState(false);
   const [batchStatus, setBatchStatus] = useState<ItemStatus>('Not start');
   const [batchType, setBatchType] = useState<ItemType>('Feature');
@@ -35,7 +35,7 @@ export function BatchManager({ items, onItemsUpdate }: BatchManagerProps) {
     }
   };
 
-  const handleSelectItem = (itemId: string) => {
+  const handleSelectItem = (itemId: number) => {
     const newSelected = new Set(selectedItems);
     if (newSelected.has(itemId)) {
       newSelected.delete(itemId);
@@ -54,7 +54,7 @@ export function BatchManager({ items, onItemsUpdate }: BatchManagerProps) {
     const updatedItems: TodoItem[] = [];
 
     for (const itemId of selectedItems) {
-      const updatedItem = StorageManager.updateItem(itemId, {
+      const updatedItem = await StorageManager.updateItem(itemId, {
         status: batchStatus,
         type: batchType
       });
@@ -72,7 +72,7 @@ export function BatchManager({ items, onItemsUpdate }: BatchManagerProps) {
     }
   };
 
-  const handleBatchDelete = () => {
+  const handleBatchDelete = async () => {
     if (selectedItems.size === 0) {
       alert('Please select items to delete');
       return;
@@ -80,15 +80,17 @@ export function BatchManager({ items, onItemsUpdate }: BatchManagerProps) {
 
     if (confirm(`Are you sure you want to delete ${selectedItems.size} items?`)) {
       const remainingItems: TodoItem[] = [];
+      const deletePromises: Promise<boolean>[] = [];
 
       for (const item of items) {
         if (!selectedItems.has(item.id)) {
           remainingItems.push(item);
         } else {
-          StorageManager.deleteItem(item.id);
+          deletePromises.push(StorageManager.deleteItem(item.id));
         }
       }
 
+      await Promise.all(deletePromises);
       onItemsUpdate(remainingItems);
       setSelectedItems(new Set());
       alert(`Successfully deleted ${selectedItems.size} items`);

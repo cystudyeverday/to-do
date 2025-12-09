@@ -16,7 +16,7 @@ export function ProjectModal({ isOpen, onClose, onProjectAdded }: ProjectModalPr
   const [description, setDescription] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!projectName.trim()) {
@@ -27,7 +27,7 @@ export function ProjectModal({ isOpen, onClose, onProjectAdded }: ProjectModalPr
     setIsSubmitting(true);
 
     try {
-      const newProject = StorageManager.addProject({
+      const newProject = await StorageManager.addProject({
         name: projectName.trim(),
         description: description.trim()
       });

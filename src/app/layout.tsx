@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { Navigation } from "@/components/navigation";
+import { ConditionalLayout } from "./layout-client";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -18,12 +18,9 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className={inter.className}>
-        <div className="flex h-screen">
-          <Navigation />
-          <main className="flex-1 overflow-y-auto">
-            {children}
-          </main>
-        </div>
+        <ConditionalLayout>
+          {children}
+        </ConditionalLayout>
       </body>
     </html>
   );

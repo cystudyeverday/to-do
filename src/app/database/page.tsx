@@ -4,16 +4,9 @@ import { useState, useEffect } from 'react';
 import {
   Database,
   Download,
-  Upload,
-  RefreshCw,
-  HardDrive,
-  Cloud,
   CheckCircle,
   XCircle,
-  AlertTriangle,
-  FileText,
-  Settings,
-  Archive
+  AlertTriangle
 } from 'lucide-react';
 
 export default function DatabasePage() {
@@ -29,7 +22,7 @@ export default function DatabasePage() {
     try {
       // 这里可以添加数据导出逻辑
       setMessage({ type: 'success', text: '数据导出功能正在开发中' });
-    } catch (error) {
+    } catch {
       setMessage({ type: 'error', text: '数据导出失败' });
     } finally {
       setIsLoading(false);
@@ -48,8 +41,8 @@ export default function DatabasePage() {
 
       {message && (
         <div className={`p-4 rounded-lg ${message.type === 'success' ? 'bg-green-50 border border-green-200 text-green-800' :
-            message.type === 'error' ? 'bg-red-50 border border-red-200 text-red-800' :
-              'bg-blue-50 border border-blue-200 text-blue-800'
+          message.type === 'error' ? 'bg-red-50 border border-red-200 text-red-800' :
+            'bg-blue-50 border border-blue-200 text-blue-800'
           }`}>
           <div className="flex items-center gap-2">
             {message.type === 'success' ? <CheckCircle className="w-4 h-4" /> :

@@ -24,7 +24,6 @@ export function QuickAddModal({
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<ItemStatus>('Not start');
   const [projectId, setProjectId] = useState<number | ''>(defaultProjectId ?? (projects[0]?.id ?? ''));
-  const [module, setModule] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // 批量输入相关状态
@@ -117,7 +116,7 @@ export function QuickAddModal({
           type: 'Feature', // Default type, not shown in UI
           status,
           projectId,
-          module: module.trim() || 'Other'
+          module: 'Other'
         });
 
         if (newTask) {
@@ -204,7 +203,6 @@ export function QuickAddModal({
     setDescription('');
     setStatus('Not start');
     setProjectId(defaultProjectId ?? (projects[0]?.id ?? ''));
-    setModule('');
     setIsSubmitting(false);
     setBatchInput('');
     setBatchPreview([]);
@@ -306,19 +304,6 @@ export function QuickAddModal({
                   placeholder="Enter task title"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Module
-                </label>
-                <input
-                  type="text"
-                  value={module}
-                  onChange={(e) => setModule(e.target.value)}
-                  placeholder="Enter module name (optional, defaults to 'Other')"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 

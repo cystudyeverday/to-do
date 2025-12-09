@@ -11,7 +11,8 @@ export class StorageManager {
     return GraphQLStorageManager.getProjects();
   }
 
-  static async saveProjects(projects: Project[]): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  static async saveProjects(_projects: Project[]): Promise<void> {
     // 这个方法在新的 GraphQL 架构中不再需要
     // 保留以保持兼容性，但不执行任何操作
     console.warn('saveProjects is deprecated. Use addProject/updateProject instead.');
@@ -21,7 +22,8 @@ export class StorageManager {
     return GraphQLStorageManager.getItems();
   }
 
-  static async saveItems(items: TodoItem[]): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  static async saveItems(_items: TodoItem[]): Promise<void> {
     // 这个方法在新的 GraphQL 架构中不再需要
     // 保留以保持兼容性，但不执行任何操作
     console.warn('saveItems is deprecated. Use addItem/updateItem instead.');

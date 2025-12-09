@@ -1,525 +1,110 @@
-import { apolloClient } from './apollo-client';
-import { GET_PROJECTS, GET_PROJECT_BY_ID, GET_ITEMS, GET_ITEMS_BY_PROJECT, GET_ITEM_BY_ID } from './graphql/queries';
-import { CREATE_PROJECT, UPDATE_PROJECT, DELETE_PROJECT, CREATE_ITEM, UPDATE_ITEM, DELETE_ITEM, CREATE_ITEMS } from './graphql/mutations';
+/**
+ * GraphQL Storage Manager
+ * Main orchestrator for data operations using GraphQL backend
+ * Delegates to repositories for basic CRUD and provides high-level operations
+ */
+
 import { Project, TodoItem } from '@/types';
+import { ProjectRepository, ItemRepository } from './repositories';
 
 /**
- * 基于 Hasura GraphQL 的存储管理器
- * 所有操作都通过 GraphQL API 进行
+ * GraphQL Storage Manager
+ * Provides a unified interface for all storage operations
  */
 export class GraphQLStorageManager {
-  // ==================== 项目相关操作 ====================
+  // ==================== Project Operations ====================
 
+  /**
+   * Get all projects
+   */
   static async getProjects(): Promise<Project[]> {
-    try {
-      const { data } = await apolloClient.query<{
-        projects: Array<{
-          id: number;
-          name: string;
-          description: string | null;
-          created_at: string;
-          updated_at: string;
-        }>;
-      }>({
-        query: GET_PROJECTS,
-        fetchPolicy: 'network-only',
-      });
-
-      if (!data) return [];
-
-      return data.projects.map((project) => ({
-        id: project.id,
-        name: project.name,
-        description: project.description || '',
-        createdAt: new Date(project.created_at),
-        updatedAt: new Date(project.updated_at),
-      }));
-    } catch (error) {
-      console.error('Error fetching projects:', error);
-      return [];
-    }
+    return ProjectRepository.getAll();
   }
 
+  /**
+   * Get project by ID
+   */
   static async getProjectById(id: number): Promise<Project | null> {
-    try {
-      const { data } = await apolloClient.query<{
-        projects_by_pk: {
-          id: number;
-          name: string;
-          description: string | null;
-          created_at: string;
-          updated_at: string;
-        } | null;
-      }>({
-        query: GET_PROJECT_BY_ID,
-        variables: { id: typeof id === 'string' ? parseInt(id, 10) : id },
-        fetchPolicy: 'network-only',
-      });
-
-      if (!data?.projects_by_pk) return null;
-
-      const project = data.projects_by_pk;
-      return {
-        id: project.id,
-        name: project.name,
-        description: project.description || '',
-        createdAt: new Date(project.created_at),
-        updatedAt: new Date(project.updated_at),
-      };
-    } catch (error) {
-      console.error('Error fetching project:', error);
-      return null;
-    }
+    return ProjectRepository.getById(id);
   }
 
+  /**
+   * Create a new project
+   */
   static async addProject(project: Omit<Project, 'id' | 'createdAt' | 'updatedAt'>): Promise<Project> {
-    try {
-      const { data } = await apolloClient.mutate<{
-        insert_projects_one: {
-          id: number;
-          name: string;
-          description: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-      }>({
-        mutation: CREATE_PROJECT,
-        variables: {
-          name: project.name,
-          description: project.description || null,
-        },
-      });
-
-      if (!data?.insert_projects_one) {
-        throw new Error('Failed to create project');
-      }
-
-      const created = data.insert_projects_one;
-      return {
-        id: created.id,
-        name: created.name,
-        description: created.description || '',
-        createdAt: new Date(created.created_at),
-        updatedAt: new Date(created.updated_at),
-      };
-    } catch (error) {
-      console.error('Error creating project:', error);
-      throw error;
-    }
+    return ProjectRepository.create(project);
   }
 
+  /**
+   * Update a project
+   */
   static async updateProject(id: number, updates: Partial<Project>): Promise<Project | null> {
-    try {
-      const { data } = await apolloClient.mutate<{
-        update_projects_by_pk: {
-          id: number;
-          name: string;
-          description: string | null;
-          created_at: string;
-          updated_at: string;
-        } | null;
-      }>({
-        mutation: UPDATE_PROJECT,
-        variables: {
-          id: typeof id === 'string' ? parseInt(id, 10) : id,
-          name: updates.name,
-          description: updates.description !== undefined ? updates.description : null,
-        },
-      });
-
-      if (!data?.update_projects_by_pk) return null;
-
-      const project = data.update_projects_by_pk;
-      return {
-        id: project.id,
-        name: project.name,
-        description: project.description || '',
-        createdAt: new Date(project.created_at),
-        updatedAt: new Date(project.updated_at),
-      };
-    } catch (error) {
-      console.error('Error updating project:', error);
-      return null;
-    }
+    return ProjectRepository.update(id, updates);
   }
 
+  /**
+   * Delete a project
+   */
   static async deleteProject(id: number): Promise<boolean> {
-    try {
-      const { data } = await apolloClient.mutate<{
-        delete_projects_by_pk: {
-          id: number;
-        } | null;
-      }>({
-        mutation: DELETE_PROJECT,
-        variables: { id: typeof id === 'string' ? parseInt(id, 10) : id },
-      });
-
-      return !!data?.delete_projects_by_pk;
-    } catch (error) {
-      console.error('Error deleting project:', error);
-      return false;
-    }
+    return ProjectRepository.delete(id);
   }
 
-  // ==================== 任务相关操作 ====================
+  // ==================== Item Operations ====================
 
+  /**
+   * Get all items
+   */
   static async getItems(): Promise<TodoItem[]> {
-    try {
-      const { data } = await apolloClient.query<{
-        items: Array<{
-          id: number;
-          title: string;
-          description: string | null;
-          type: string;
-          status: string;
-          project_id: number;
-          module: string | null;
-          created_at: string;
-          updated_at: string;
-          completed_at: string | null;
-        }>;
-      }>({
-        query: GET_ITEMS,
-        fetchPolicy: 'network-only',
-      });
-
-      if (!data) return [];
-
-      return data.items.map((item) => ({
-        id: item.id,
-        title: item.title,
-        description: item.description || '',
-        type: item.type as 'Feature' | 'Issue',
-        status: item.status as TodoItem['status'],
-        projectId: item.project_id,
-        module: item.module || 'Other',
-        createdAt: new Date(item.created_at),
-        updatedAt: new Date(item.updated_at),
-        completedAt: item.completed_at ? new Date(item.completed_at) : undefined,
-      }));
-    } catch (error) {
-      console.error('Error fetching items:', error);
-      return [];
-    }
+    return ItemRepository.getAll();
   }
 
+  /**
+   * Get items by project
+   */
   static async getItemsByProject(projectId: number): Promise<TodoItem[]> {
-    try {
-      const { data } = await apolloClient.query<{
-        items: Array<{
-          id: number;
-          title: string;
-          description: string | null;
-          type: string;
-          status: string;
-          project_id: number;
-          module: string | null;
-          created_at: string;
-          updated_at: string;
-          completed_at: string | null;
-        }>;
-      }>({
-        query: GET_ITEMS_BY_PROJECT,
-        variables: { projectId: typeof projectId === 'string' ? parseInt(projectId, 10) : projectId },
-        fetchPolicy: 'network-only',
-      });
-
-      if (!data) return [];
-
-      return data.items.map((item) => ({
-        id: item.id,
-        title: item.title,
-        description: item.description || '',
-        type: item.type as 'Feature' | 'Issue',
-        status: item.status as TodoItem['status'],
-        projectId: item.project_id,
-        module: item.module || 'Other',
-        createdAt: new Date(item.created_at),
-        updatedAt: new Date(item.updated_at),
-        completedAt: item.completed_at ? new Date(item.completed_at) : undefined,
-      }));
-    } catch (error) {
-      console.error('Error fetching project items:', error);
-      return [];
-    }
+    return ItemRepository.getByProject(projectId);
   }
 
+  /**
+   * Get item by ID
+   */
   static async getItemById(id: number): Promise<TodoItem | null> {
-    try {
-      const { data } = await apolloClient.query<{
-        items_by_pk: {
-          id: number;
-          title: string;
-          description: string | null;
-          type: string;
-          status: string;
-          project_id: number;
-          module: string | null;
-          created_at: string;
-          updated_at: string;
-          completed_at: string | null;
-        } | null;
-      }>({
-        query: GET_ITEM_BY_ID,
-        variables: { id: typeof id === 'string' ? parseInt(id, 10) : id },
-        fetchPolicy: 'network-only',
-      });
-
-      if (!data?.items_by_pk) return null;
-
-      const item = data.items_by_pk;
-      return {
-        id: item.id,
-        title: item.title,
-        description: item.description || '',
-        type: item.type as 'Feature' | 'Issue',
-        status: item.status as TodoItem['status'],
-        projectId: item.project_id,
-        module: item.module || 'Other',
-        createdAt: new Date(item.created_at),
-        updatedAt: new Date(item.updated_at),
-        completedAt: item.completed_at ? new Date(item.completed_at) : undefined,
-      };
-    } catch (error) {
-      console.error('Error fetching item:', error);
-      return null;
-    }
+    return ItemRepository.getById(id);
   }
 
+  /**
+   * Create a new item
+   */
   static async addItem(item: Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<TodoItem> {
-    try {
-      const { data } = await apolloClient.mutate<{
-        insert_items_one: {
-          id: number;
-          title: string;
-          description: string | null;
-          type: string;
-          status: string;
-          project_id: number;
-          module: string | null;
-          created_at: string;
-          updated_at: string;
-          completed_at: string | null;
-        };
-      }>({
-        mutation: CREATE_ITEM,
-        variables: {
-          title: item.title,
-          description: item.description || null,
-          type: item.type,
-          status: item.status,
-          project_id: item.projectId,
-          module: item.module || null,
-        },
-      });
-
-      if (!data?.insert_items_one) {
-        throw new Error('Failed to create item');
-      }
-
-      const created = data.insert_items_one;
-      return {
-        id: created.id,
-        title: created.title,
-        description: created.description || '',
-        type: created.type as 'Feature' | 'Issue',
-        status: created.status as TodoItem['status'],
-        projectId: created.project_id,
-        module: created.module || 'Other',
-        createdAt: new Date(created.created_at),
-        updatedAt: new Date(created.updated_at),
-        completedAt: created.completed_at ? new Date(created.completed_at) : undefined,
-      };
-    } catch (error) {
-      console.error('Error creating item:', error);
-      throw error;
-    }
+    return ItemRepository.create(item);
   }
 
+  /**
+   * Update an item
+   */
   static async updateItem(id: number, updates: Partial<TodoItem>): Promise<TodoItem | null> {
-    try {
-      const numId = typeof id === 'string' ? parseInt(id, 10) : id;
-
-      // 构建只包含要更新的字段的 _set 对象
-      // 只添加实际要更新的字段，未包含的字段不会被更新（merge 行为）
-      const setObject: any = {};
-
-      // 只添加实际要更新的字段
-      if (updates.title !== undefined && updates.title !== null && updates.title.trim() !== '') {
-        setObject.title = updates.title;
-      }
-      if (updates.description !== undefined) {
-        setObject.description = updates.description || null;
-      }
-      if (updates.type !== undefined && updates.type !== null) {
-        setObject.type = updates.type;
-      }
-      if (updates.status !== undefined && updates.status !== null) {
-        setObject.status = updates.status;
-      }
-      if (updates.projectId !== undefined && updates.projectId !== null) {
-        setObject.project_id = updates.projectId;
-      }
-      if (updates.module !== undefined) {
-        setObject.module = updates.module || null;
-      }
-      if (updates.completedAt !== undefined) {
-        if (updates.completedAt) {
-          const date = new Date(updates.completedAt);
-          const year = date.getUTCFullYear();
-          const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
-          const day = date.getUTCDate().toString().padStart(2, '0');
-          const hours = date.getUTCHours().toString().padStart(2, '0');
-          const minutes = date.getUTCMinutes().toString().padStart(2, '0');
-          const seconds = date.getUTCSeconds().toString().padStart(2, '0');
-          setObject.completed_at = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-        } else {
-          setObject.completed_at = null;
-        }
-      }
-
-      // 总是更新 updated_at 时间戳为当前时间
-      const now = new Date();
-      const year = now.getUTCFullYear();
-      const month = (now.getUTCMonth() + 1).toString().padStart(2, '0');
-      const day = now.getUTCDate().toString().padStart(2, '0');
-      const hours = now.getUTCHours().toString().padStart(2, '0');
-      const minutes = now.getUTCMinutes().toString().padStart(2, '0');
-      const seconds = now.getUTCSeconds().toString().padStart(2, '0');
-      setObject.updated_at = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-
-      const { data } = await apolloClient.mutate<{
-        update_items_by_pk: {
-          id: number;
-          title: string;
-          description: string | null;
-          type: string;
-          status: string;
-          project_id: number;
-          module: string | null;
-          created_at: string;
-          updated_at: string;
-          completed_at: string | null;
-        } | null;
-      }>({
-        mutation: UPDATE_ITEM,
-        variables: {
-          id: numId,
-          set: setObject,
-        },
-      });
-
-      if (!data?.update_items_by_pk) return null;
-
-      const item = data.update_items_by_pk;
-      return {
-        id: item.id,
-        title: item.title,
-        description: item.description || '',
-        type: item.type as 'Feature' | 'Issue',
-        status: item.status as TodoItem['status'],
-        projectId: item.project_id,
-        module: item.module || 'Other',
-        createdAt: new Date(item.created_at),
-        updatedAt: new Date(item.updated_at),
-        completedAt: item.completed_at ? new Date(item.completed_at) : undefined,
-      };
-    } catch (error) {
-      console.error('Error updating item:', error);
-      return null;
-    }
+    return ItemRepository.update(id, updates);
   }
 
+  /**
+   * Delete an item
+   */
   static async deleteItem(id: number): Promise<boolean> {
-    try {
-      const { data } = await apolloClient.mutate<{
-        delete_items_by_pk: {
-          id: number;
-        } | null;
-      }>({
-        mutation: DELETE_ITEM,
-        variables: { id: typeof id === 'string' ? parseInt(id, 10) : id },
-      });
-
-      return !!data?.delete_items_by_pk;
-    } catch (error) {
-      console.error('Error deleting item:', error);
-      return false;
-    }
+    return ItemRepository.delete(id);
   }
 
-  // ==================== 批量操作 ====================
-
+  /**
+   * Create multiple items in batch
+   */
   static async addItems(items: Omit<TodoItem, 'id' | 'createdAt' | 'updatedAt'>[]): Promise<TodoItem[]> {
-    try {
-      const objects = items.map((item) => {
-        let completed_at: string | null = null;
-        if (item.completedAt) {
-          const date = new Date(item.completedAt);
-          // 格式化为 timestamp 格式 (YYYY-MM-DD HH:MM:SS)，不带时区
-          const year = date.getUTCFullYear();
-          const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
-          const day = date.getUTCDate().toString().padStart(2, '0');
-          const hours = date.getUTCHours().toString().padStart(2, '0');
-          const minutes = date.getUTCMinutes().toString().padStart(2, '0');
-          const seconds = date.getUTCSeconds().toString().padStart(2, '0');
-          completed_at = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
-        }
-        return {
-          title: item.title,
-          description: item.description || null,
-          type: item.type,
-          status: item.status,
-          project_id: item.projectId,
-          module: item.module || null,
-          completed_at,
-        };
-      });
-
-      const { data } = await apolloClient.mutate<{
-        insert_items: {
-          returning: Array<{
-            id: number;
-            title: string;
-            description: string | null;
-            type: string;
-            status: string;
-            project_id: number;
-            module: string | null;
-            created_at: string;
-            updated_at: string;
-            completed_at: string | null;
-          }>;
-        };
-      }>({
-        mutation: CREATE_ITEMS,
-        variables: { objects },
-      });
-
-      if (!data?.insert_items) {
-        throw new Error('Failed to create items');
-      }
-
-      return data.insert_items.returning.map((item) => ({
-        id: item.id,
-        title: item.title,
-        description: item.description || '',
-        type: item.type as 'Feature' | 'Issue',
-        status: item.status as TodoItem['status'],
-        projectId: item.project_id,
-        module: item.module || 'Other',
-        createdAt: new Date(item.created_at),
-        updatedAt: new Date(item.updated_at),
-        completedAt: item.completed_at ? new Date(item.completed_at) : undefined,
-      }));
-    } catch (error) {
-      console.error('Error creating items:', error);
-      throw error;
-    }
+    return ItemRepository.createBatch(items);
   }
 
-  // ==================== 特殊功能 ====================
+  // ==================== High-Level Operations ====================
 
+  /**
+   * Archive all completed items in a project
+   */
   static async archiveCompletedItems(projectId: number): Promise<number> {
     try {
       const items = await this.getItemsByProject(projectId);
@@ -533,32 +118,32 @@ export class GraphQLStorageManager {
 
       return archivedCount;
     } catch (error) {
-      console.error('Error archiving items:', error);
+      console.error('[GraphQLStorageManager] Error archiving items:', error);
       return 0;
     }
   }
 
+  /**
+   * Get items completed in the last week
+   */
   static async getWeeklyCompletedItems(): Promise<TodoItem[]> {
     try {
-      const items = await this.getItems();
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const now = new Date();
 
-      return items.filter(
-        (item) =>
-          item.status === 'Completed' &&
-          item.completedAt &&
-          item.completedAt >= oneWeekAgo
-      );
+      return ItemRepository.getCompletedInRange(oneWeekAgo, now);
     } catch (error) {
-      console.error('Error fetching weekly completed items:', error);
+      console.error('[GraphQLStorageManager] Error fetching weekly completed items:', error);
       return [];
     }
   }
 
+  /**
+   * Get statistics (delegates to statistics API)
+   */
   static async getStatistics(): Promise<any> {
     try {
-      // 使用统计 API 端点
       const response = await fetch('/api/statistics');
       if (!response.ok) {
         throw new Error('Failed to fetch statistics');
@@ -566,7 +151,7 @@ export class GraphQLStorageManager {
       const data = await response.json();
       return data.statistics;
     } catch (error) {
-      console.error('Error fetching statistics:', error);
+      console.error('[GraphQLStorageManager] Error fetching statistics:', error);
       return {
         totalItems: 0,
         completedItems: 0,
@@ -583,6 +168,9 @@ export class GraphQLStorageManager {
     }
   }
 
+  /**
+   * Export all data
+   */
   static async exportData(): Promise<any> {
     try {
       const projects = await this.getProjects();
@@ -599,14 +187,17 @@ export class GraphQLStorageManager {
         statistics,
       };
     } catch (error) {
-      console.error('Error exporting data:', error);
+      console.error('[GraphQLStorageManager] Error exporting data:', error);
       throw error;
     }
   }
 
+  /**
+   * Import data from external source
+   */
   static async importData(data: { projects: any[]; items: any[] }): Promise<any> {
     try {
-      // 导入项目
+      // Import projects
       const importedProjects: Project[] = [];
       for (const project of data.projects) {
         const newProject = await this.addProject({
@@ -616,7 +207,7 @@ export class GraphQLStorageManager {
         importedProjects.push(newProject);
       }
 
-      // 导入任务（需要映射项目 ID）
+      // Map old project IDs to new project IDs
       const projectIdMap = new Map<string | number, number>();
       data.projects.forEach((oldProject, index) => {
         if (importedProjects[index]) {
@@ -624,6 +215,7 @@ export class GraphQLStorageManager {
         }
       });
 
+      // Import items with mapped project IDs
       const importedItems: TodoItem[] = [];
       for (const item of data.items) {
         const newProjectId = projectIdMap.get(item.projectId) || item.projectId;
@@ -641,9 +233,8 @@ export class GraphQLStorageManager {
 
       return { projects: importedProjects, items: importedItems };
     } catch (error) {
-      console.error('Error importing data:', error);
+      console.error('[GraphQLStorageManager] Error importing data:', error);
       throw error;
     }
   }
 }
-

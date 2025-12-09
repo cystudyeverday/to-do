@@ -22,7 +22,7 @@ export function QuickEdit({ item, onUpdate }: QuickEditProps) {
     setIsSubmitting(true);
 
     try {
-      const updatedItem = StorageManager.updateItem(item.id, {
+      const updatedItem = await StorageManager.updateItem(item.id, {
         status,
         type,
         module

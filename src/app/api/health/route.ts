@@ -31,13 +31,13 @@ export async function GET() {
           fetchPolicy: 'network-only',
         });
         healthStatus.services.graphql = 'healthy';
-      } catch (error) {
+      } catch {
         healthStatus.services.graphql = 'unhealthy';
       }
     } else {
       healthStatus.services.graphql = 'not_configured';
     }
-  } catch (error) {
+  } catch {
     healthStatus.services.graphql = 'unhealthy';
   }
 
