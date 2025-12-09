@@ -18,3 +18,16 @@ export {
   batchUpdateStatus,
   getOverdueItems,
 } from './item.service';
+
+// Statistics Service - 统计服务
+export {
+  getStatistics,
+  getProjectStatistics,
+  getTrendData,
+} from './statistics.service';
+export type {
+  Statistics,
+  ProjectEfficiency,
+  TypeDistribution,
+  DailyCompletion,
+} from './statistics.service';

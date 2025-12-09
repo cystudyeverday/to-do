@@ -1,15 +1,18 @@
-import { NextResponse } from 'next/server';
+/**
+ * Database Schema API Route
+ * Returns the database schema definitions
+ * 
+ * GET /api/schema - Get database schema information
+ */
+
+import { NextRequest } from 'next/server';
+import { asyncHandler, successResponse } from '@/lib/api';
 
 /**
- * GET /api/schema - 获取数据库表结构定义
- * 
- * 返回所有数据表的 schema 信息，包括：
- * - SQLite schema
- * - PostgreSQL/Hasura schema
- * - TypeScript 类型定义
- * - GraphQL 类型定义
+ * GET /api/schema
+ * Returns comprehensive schema information for all database tables
  */
-export async function GET() {
+export const GET = asyncHandler(async (request: NextRequest) => {
   const schema = {
     version: '1.0.0',
     timestamp: new Date().toISOString(),
@@ -320,7 +323,7 @@ interface TodoItem {
             { name: 'title', type: 'string', required: true },
             { name: 'description', type: 'string', required: true },
             { name: 'type', type: "ItemType ('Feature' | 'Issue')", required: true },
-            { name: 'status', type: "ItemStatus", required: true },
+            { name: 'status', type: 'ItemStatus', required: true },
             { name: 'projectId', type: 'string', required: true },
             { name: 'module', type: 'string', required: false },
             { name: 'createdAt', type: 'Date', required: true },
@@ -434,6 +437,5 @@ interface TodoItem {
     ],
   };
 
-  return NextResponse.json(schema, { status: 200 });
-}
-
+  return successResponse(schema);
+});

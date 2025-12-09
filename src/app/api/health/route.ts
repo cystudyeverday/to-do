@@ -1,6 +1,14 @@
-import { NextResponse } from 'next/server';
+/**
+ * Health Check API Route
+ * Check the health status of the application and its dependencies
+ * 
+ * GET /api/health - Health check endpoint
+ */
+
+import { NextRequest } from 'next/server';
 import { apolloClient } from '@/lib/apollo-client';
 import { gql } from '@apollo/client/core';
+import { asyncHandler, successResponse } from '@/lib/api';
 
 const HEALTH_CHECK_QUERY = gql`
   query HealthCheck {
@@ -8,18 +16,32 @@ const HEALTH_CHECK_QUERY = gql`
   }
 `;
 
-export async function GET() {
-  const healthStatus = {
+interface HealthStatus {
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  timestamp: string;
+  version: string;
+  services: {
+    api: 'healthy' | 'unhealthy';
+    graphql: 'healthy' | 'unhealthy' | 'not_configured';
+  };
+}
+
+/**
+ * GET /api/health
+ * Returns the health status of the application
+ */
+export const GET = asyncHandler(async (request: NextRequest) => {
+  const healthStatus: HealthStatus = {
     status: 'healthy',
     timestamp: new Date().toISOString(),
     version: '1.0.0',
     services: {
       api: 'healthy',
-      graphql: 'unknown' as 'healthy' | 'unhealthy' | 'unknown',
+      graphql: 'not_configured',
     },
   };
 
-  // 检查 GraphQL 连接
+  // Check GraphQL connection
   try {
     const hasuraEndpoint = process.env.HASURA_GRAPHQL_ENDPOINT;
     const hasuraSecret = process.env.HASURA_ADMIN_SECRET;
@@ -33,13 +55,13 @@ export async function GET() {
         healthStatus.services.graphql = 'healthy';
       } catch {
         healthStatus.services.graphql = 'unhealthy';
+        healthStatus.status = 'degraded';
       }
-    } else {
-      healthStatus.services.graphql = 'not_configured';
     }
   } catch {
     healthStatus.services.graphql = 'unhealthy';
+    healthStatus.status = 'unhealthy';
   }
 
-  return NextResponse.json(healthStatus);
-} 
+  return successResponse(healthStatus);
+});
