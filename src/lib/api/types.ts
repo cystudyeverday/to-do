@@ -9,14 +9,14 @@
 export interface ApiResponse<T = any> {
   success: boolean;
   data?: T;
-  error?: ApiError;
+  error?: ApiErrorResponse;
   meta?: ResponseMeta;
 }
 
 /**
- * API Error
+ * API Error Response
  */
-export interface ApiError {
+export interface ApiErrorResponse {
   code: string;
   message: string;
   details?: any;

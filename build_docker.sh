@@ -1,44 +1,43 @@
-r#!/bin/bash
+#!/usr/bin/env bash
+# ./build-docker.sh dev
+# Updated the script. When you run ./build-docker.sh dev:
+# Tags the image as development instead of latest
+# Sets the build environment to development
+# Matches the icac-frontend-dev service in docker-compose.yml, which uses astribigdata/icac-frontend:development
 
-# Set variables
-IMAGE_NAME="my-todo-app"
-CONTAINER_NAME="my-todo-container"
-PORT=5000
+# ./build-docker.sh 
+# When run without arguments or with prod, it still tags as latest as before.
+VERION="1.0"
 
-echo "🐳 Building Docker image for my-todo-app..."
-# Remove the old image if it exists (optional, uncomment if you want to clean up old images)
-docker rmi $IMAGE_NAME 2>/dev/null || true
-# Build the Docker image
-docker build -t $IMAGE_NAME .
+DOCKER_USER="caiyang"
 
-if [ $? -ne 0 ]; then
-    echo "❌ Docker build failed!"
-    exit 1
-fi
+MODULE_NAME="my-todo-app"
+IMAGE_NAME="${DOCKER_USER}/${MODULE_NAME}:${VERION}"
+IMAGE_LATEST="${DOCKER_USER}/${MODULE_NAME}:latest"
 
-echo "✅ Docker image built successfully!"
+RED=`tput setaf 1`
+GREEN=`tput setaf 2`
+YELLOW=`tput setaf 11`
+RESET=`tput sgr0`
 
-# Stop and remove the old container if it exists
-echo "🔄 Stopping and removing old container if it exists..."
-docker stop $CONTAINER_NAME 2>/dev/null || true
-docker rm $CONTAINER_NAME 2>/dev/null || true
+cd `dirname $0`
+echo "Start from folder:${YELLOW}`pwd`${RESET}"
 
-
-
-# Run the new container
-echo "🚀 Starting new container on port $PORT..."
-docker run -d \
-    --name $CONTAINER_NAME \
-    -p $PORT:3000 \
-    --restart unless-stopped \
-    $IMAGE_NAME
-
-if [ $? -eq 0 ]; then
-    echo "✅ Container started successfully!"
-    echo "🌐 Your app is now running at: http://localhost:$PORT"
-    echo "📊 Container status:"
-    docker ps --filter "name=$CONTAINER_NAME"
+# Use 'prod' environment for icac-frontend-dev service, or pass ENVIRONMENT as argument
+ENVIRONMENT=${1:-prod}
+# Use 'development' tag for dev builds, 'latest' for prod builds
+if [ "${ENVIRONMENT}" = "dev" ]; then
+    IMAGE_TAG="${DOCKER_USER}/${MODULE_NAME}:development"
+    ENVIRONMENT="development"
 else
-    echo "❌ Failed to start container!"
-    exit 1
+    IMAGE_TAG="${IMAGE_LATEST}"
 fi
+echo "Image Name:${YELLOW} ${IMAGE_TAG}${RESET}"
+echo "${GREEN}Creating Docker Image${RESET}"
+echo "Building with environment: ${YELLOW}${ENVIRONMENT}${RESET}"
+sudo docker build --build-arg ENVIRONMENT=${ENVIRONMENT} --build-arg MODULE_NAME=${MODULE_NAME} -t ${IMAGE_TAG} .
+echo "${GREEN}Done${RESET}"
+
+echo "run docker compose up"
+sudo docker compose down
+sudo docker compose up -d

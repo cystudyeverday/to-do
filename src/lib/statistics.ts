@@ -34,11 +34,9 @@ export class StatisticsCalculator {
     const statusDistribution = {
       'Not start': items.filter(item => item.status === 'Not start').length,
       'On progress': items.filter(item => item.status === 'On progress').length,
-      'Waiting for API': items.filter(item => item.status === 'Waiting for API').length,
-      'Build UI': items.filter(item => item.status === 'Build UI').length,
-      'Integration': items.filter(item => item.status === 'Integration').length,
+      'Pending': items.filter(item => item.status === 'Pending').length,
       'Completed': items.filter(item => item.status === 'Completed').length,
-      'Fix': items.filter(item => item.status === 'Fix').length,
+      'Archive': items.filter(item => item.status === 'Archive').length,
     };
 
     // 按类型统计

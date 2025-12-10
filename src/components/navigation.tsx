@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import {
@@ -26,7 +26,7 @@ const navigation = [
   { name: 'Database', href: '/database', icon: Database },
 ];
 
-export function Navigation() {
+function NavigationContent() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -230,5 +230,22 @@ export function Navigation() {
         </div>
       </div>
     </nav>
+  );
+}
+
+export function Navigation() {
+  return (
+    <Suspense fallback={
+      <nav className="w-64 bg-white border-r border-gray-200 flex flex-col h-screen">
+        <div className="p-4 border-b border-gray-200">
+          <h1 className="text-xl font-bold text-gray-900">My Todo</h1>
+        </div>
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-2">Loading...</div>
+        </div>
+      </nav>
+    }>
+      <NavigationContent />
+    </Suspense>
   );
 } 

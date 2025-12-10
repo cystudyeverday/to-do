@@ -16,8 +16,9 @@ import { getItemById, updateItem, deleteItem } from '@/lib/api/controllers';
  * Get a single item by ID
  */
 export const GET = asyncHandler(
-  async (request: NextRequest, { params }: { params: { id: string } }) => {
-    return getItemById(request, params);
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+    const resolvedParams = await params;
+    return getItemById(request, resolvedParams);
   }
 );
 
@@ -27,8 +28,9 @@ export const GET = asyncHandler(
  * Body: UpdateItemDto
  */
 export const PUT = asyncHandler(
-  async (request: NextRequest, { params }: { params: { id: string } }) => {
-    return updateItem(request, params);
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+    const resolvedParams = await params;
+    return updateItem(request, resolvedParams);
   }
 );
 
@@ -37,7 +39,8 @@ export const PUT = asyncHandler(
  * Delete an item
  */
 export const DELETE = asyncHandler(
-  async (request: NextRequest, { params }: { params: { id: string } }) => {
-    return deleteItem(request, params);
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+    const resolvedParams = await params;
+    return deleteItem(request, resolvedParams);
   }
 );

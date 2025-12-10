@@ -21,8 +21,9 @@ import {
  * Query params: includeStats (boolean)
  */
 export const GET = asyncHandler(
-  async (request: NextRequest, { params }: { params: { id: string } }) => {
-    return getProjectById(request, params);
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+    const resolvedParams = await params;
+    return getProjectById(request, resolvedParams);
   }
 );
 
@@ -32,8 +33,9 @@ export const GET = asyncHandler(
  * Body: UpdateProjectDto
  */
 export const PUT = asyncHandler(
-  async (request: NextRequest, { params }: { params: { id: string } }) => {
-    return updateProject(request, params);
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+    const resolvedParams = await params;
+    return updateProject(request, resolvedParams);
   }
 );
 
@@ -43,7 +45,8 @@ export const PUT = asyncHandler(
  * Query params: cascade (boolean) - If true, deletes all project items
  */
 export const DELETE = asyncHandler(
-  async (request: NextRequest, { params }: { params: { id: string } }) => {
-    return deleteProject(request, params);
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+    const resolvedParams = await params;
+    return deleteProject(request, resolvedParams);
   }
 );
