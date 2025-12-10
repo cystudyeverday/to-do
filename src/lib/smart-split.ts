@@ -122,7 +122,7 @@ export class SmartSplitter {
         type,
         module,
         summary,
-        status: 'Not start' as ItemStatus
+        status: 'Not start'
       });
     });
 

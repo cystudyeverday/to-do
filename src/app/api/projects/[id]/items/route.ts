@@ -14,7 +14,8 @@ import { getProjectItems } from '@/lib/api/controllers';
  * Get all items for a specific project
  */
 export const GET = asyncHandler(
-  async (request: NextRequest, { params }: { params: { id: string } }) => {
-    return getProjectItems(request, params);
+  async (request: NextRequest, { params }: { params: Promise<{ id: string }> }) => {
+    const resolvedParams = await params;
+    return getProjectItems(request, resolvedParams);
   }
 );

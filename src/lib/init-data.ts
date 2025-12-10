@@ -48,7 +48,7 @@ export async function initializeSampleData() {
     title: '电商平台 - 购物车功能',
     description: '实现购物车功能，支持添加商品、修改数量、删除商品',
     type: 'Feature',
-    status: 'Build UI',
+    status: 'On progress',
     projectId: project1.id,
     module: 'Frontend'
   });
@@ -57,7 +57,7 @@ export async function initializeSampleData() {
     title: '电商平台 - 支付接口集成',
     description: '集成第三方支付接口，支持支付宝、微信支付',
     type: 'Feature',
-    status: 'Waiting for API',
+    status: 'Pending',
     projectId: project1.id,
     module: 'Backend'
   });
@@ -66,7 +66,7 @@ export async function initializeSampleData() {
     title: '电商平台 - 修复登录页面样式问题',
     description: '修复登录页面在移动端的显示问题，优化用户体验',
     type: 'Issue',
-    status: 'Fix',
+    status: 'On progress',
     projectId: project1.id,
     module: 'Frontend'
   });
@@ -103,7 +103,7 @@ export async function initializeSampleData() {
     title: '移动端APP - 修复推送通知问题',
     description: '修复推送通知在某些设备上无法正常显示的问题',
     type: 'Issue',
-    status: 'Fix',
+    status: 'On progress',
     projectId: project2.id,
     module: 'Backend'
   });
@@ -113,7 +113,7 @@ export async function initializeSampleData() {
     title: '后台管理系统 - 数据统计面板',
     description: '开发数据统计面板，展示销售数据、用户增长、商品分析等',
     type: 'Feature',
-    status: 'Integration',
+    status: 'On progress',
     projectId: project3.id,
     module: 'Dashboard'
   });
@@ -131,7 +131,7 @@ export async function initializeSampleData() {
     title: '后台管理系统 - 商品管理',
     description: '开发商品管理功能，支持添加、编辑、下架商品',
     type: 'Feature',
-    status: 'Build UI',
+    status: 'On progress',
     projectId: project3.id,
     module: 'Content Management'
   });
@@ -149,7 +149,7 @@ export async function initializeSampleData() {
     title: '后台管理系统 - 修复数据导出功能',
     description: '修复数据导出功能在某些浏览器上的兼容性问题',
     type: 'Issue',
-    status: 'Fix',
+    status: 'On progress',
     projectId: project3.id,
     module: 'Backend'
   });

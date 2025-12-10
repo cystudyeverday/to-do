@@ -14,11 +14,11 @@ export default function RecoveryPage() {
     checkData();
   }, []);
 
-  const checkData = () => {
+  const checkData = async () => {
     try {
       // 检查当前存储的数据
-      const currentProjects = StorageManager.getProjects();
-      const currentItems = StorageManager.getItems();
+      const currentProjects = await StorageManager.getProjects();
+      const currentItems = await StorageManager.getItems();
 
       setProjects(currentProjects);
       setItems(currentItems);
@@ -51,48 +51,52 @@ export default function RecoveryPage() {
     }
   };
 
-  const createSampleData = () => {
+  const createSampleData = async () => {
     if (confirm('确定要创建示例数据吗？这将覆盖现有数据！')) {
-      // 创建示例项目
-      const sampleProject = StorageManager.addProject({
-        name: '示例项目',
-        description: '这是一个示例项目'
-      });
+      try {
+        // 创建示例项目
+        const sampleProject = await StorageManager.addProject({
+          name: '示例项目',
+          description: '这是一个示例项目'
+        });
 
-      // 创建示例任务
-      const sampleItems = [
-        {
-          title: '完成前端开发',
-          description: '实现用户界面和交互功能',
-          type: 'Feature' as const,
-          status: 'On progress' as const,
-          projectId: sampleProject.id,
-          module: 'Frontend'
-        },
+        // 创建示例任务
+        const sampleItems = [
+          {
+            title: '完成前端开发',
+            description: '实现用户界面和交互功能',
+            type: 'Feature' as const,
+            status: 'On progress' as const,
+            projectId: sampleProject.id,
+            module: 'Frontend'
+          },
         {
           title: '修复登录bug',
           description: '解决用户登录时的问题',
           type: 'Issue' as const,
-          status: 'Fix' as const,
+          status: 'On progress' as const,
           projectId: sampleProject.id,
           module: 'Backend'
         },
-        {
-          title: '数据库优化',
-          description: '优化数据库查询性能',
-          type: 'Feature' as const,
-          status: 'Not start' as const,
-          projectId: sampleProject.id,
-          module: 'Database'
+          {
+            title: '数据库优化',
+            description: '优化数据库查询性能',
+            type: 'Feature' as const,
+            status: 'Not start' as const,
+            projectId: sampleProject.id,
+            module: 'Database'
+          }
+        ];
+
+        for (const item of sampleItems) {
+          await StorageManager.addItem(item);
         }
-      ];
 
-      sampleItems.forEach(item => {
-        StorageManager.addItem(item);
-      });
-
-      checkData();
-      setRecoveryStatus('示例数据已创建');
+        await checkData();
+        setRecoveryStatus('示例数据已创建');
+      } catch (error) {
+        setRecoveryStatus(`创建示例数据失败: ${error}`);
+      }
     }
   };
 
@@ -114,19 +118,19 @@ export default function RecoveryPage() {
     URL.revokeObjectURL(url);
   };
 
-  const importData = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const importData = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const data = JSON.parse(e.target?.result as string);
 
         if (data.projects && data.items) {
           localStorage.setItem('todo_projects', JSON.stringify(data.projects));
           localStorage.setItem('todo_items', JSON.stringify(data.items));
-          checkData();
+          await checkData();
           setRecoveryStatus('数据导入成功');
         } else {
           setRecoveryStatus('导入失败：文件格式不正确');

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { TodoItem, Project, ItemStatus } from '@/types';
 import { StorageManager } from '@/lib/storage';
@@ -25,7 +25,7 @@ import {
   Check
 } from 'lucide-react';
 
-export default function DashboardPage() {
+function DashboardContent() {
   const searchParams = useSearchParams();
   const [projects, setProjects] = useState<Project[]>([]);
   const [items, setItems] = useState<TodoItem[]>([]);
@@ -105,6 +105,8 @@ export default function DashboardPage() {
   };
 
   const getProjectItems = (projectId: number, includeCompleted: boolean = true) => {
+    interface ItemWithModule extends TodoItem { module?: string }
+    
     let projectItems = items.filter(item => item.projectId === projectId && item.status !== 'Archive' as ItemStatus);
 
     // Separate completed and unfinished items
@@ -146,7 +148,6 @@ export default function DashboardPage() {
 
         case 'module':
           // Module：按 module 排序，相同 module 内按状态排序
-          interface ItemWithModule extends TodoItem { module?: string }
           const moduleA = (a as ItemWithModule).module || 'Other';
           const moduleB = (b as ItemWithModule).module || 'Other';
           if (moduleA !== moduleB) {
@@ -949,5 +950,13 @@ export default function DashboardPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+      <DashboardContent />
+    </Suspense>
   );
 } 

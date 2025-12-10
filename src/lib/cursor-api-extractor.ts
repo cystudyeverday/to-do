@@ -235,7 +235,7 @@ Return only the JSON array of tasks, no additional text.`;
           type: 'Feature',
           module: 'Other',
           summary: '',
-          status: 'Not start' as ItemStatus,
+          status: 'Not start',
         };
       } else if (currentTask.title && line.trim()) {
         // 任务描述

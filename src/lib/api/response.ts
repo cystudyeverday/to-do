@@ -4,7 +4,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { ApiResponse, ApiError as ApiErrorType, ResponseMeta } from './types';
+import { ApiResponse, ApiErrorResponse, ResponseMeta } from './types';
 import { ApiError } from './errors';
 
 /**
@@ -36,7 +36,7 @@ export function errorResponse(
 ): NextResponse<ApiResponse> {
   const isDevelopment = process.env.NODE_ENV === 'development';
 
-  let apiError: ApiErrorType;
+  let apiError: ApiErrorResponse;
   let statusCode: number;
 
   if (error instanceof ApiError) {
